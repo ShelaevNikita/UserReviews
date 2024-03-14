@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.sln
+*.pyproj
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+.vs/
+downloads/
+lib/
+lib64/
+var/
+wheels/
+
+# Unit test / coverage reports
+.coverage
+.cache
+coverage.xml
+
+# Environments
+.env
+.venv
+
+# mkdocs documentation
+/site
