@@ -2,18 +2,22 @@
 
 import src.dataMiningKinopoisk.filmMining   as filmMining
 import src.dataMiningKinopoisk.reviewMining as reviewMining
+import src.dataAnalytics                    as dataAnalytics
 
 def userReviews():
 
-    dataPathFilms   = './data/films.json'
+    dataPathFilms   = './data/movies.json'
     dataPathReviews = './data/reviews.json'
-    threads  = 1
-    #maxID   = 700000
-    maxID    = 435 
+    threads         = 4
+    #maxID          = 700000
+    maxID           = 435
+    reviewInPage    = 10
 
-    filmMining.FilmMining(dataPathFilms, threads, maxID).main()
+    #filmMining.FilmMining(dataPathFilms, threads, maxID).main()
     
-    #reviewMining.ReviewMining(dataPathFilms, dataPathReviews, threads).main()
+    reviewMining.ReviewMining(dataPathFilms, dataPathReviews, threads, reviewInPage).main()
+
+    #dataAnalytics.DataAnalytics(dataPathFilms, dataPathReviews).main()
 
     return
 
