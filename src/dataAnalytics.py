@@ -4,11 +4,13 @@ import json
 
 class DataAnalytics(object):
     
-    def __init__(self, dataPathFilms, dataPathReviews):
-        self.dataPathFilms   = dataPathFilms
-        self.dataPathReviews = dataPathReviews
+    def __init__(self, configParameters):
+        
+        self.dataPathFilms   = configParameters['dataPathFilms']
+        self.dataPathReviews = configParameters['dataPathReviews']
      
     def getJSONFromFile(self, dataPath):
+        
         try:
             with open(dataPath, 'r', encoding = 'utf-8') as file:
                 return json.loads(file.read(), strict = False)
@@ -18,6 +20,7 @@ class DataAnalytics(object):
             return None
     
     def main(self):
+        
         filmJSON   = self.getJSONFromFile(self.dataPathFilms)
         reviewJSON = self.getJSONFromFile(self.dataPathReviews)
         
@@ -25,7 +28,9 @@ class DataAnalytics(object):
     
 if __name__ == '__main__':
     
-    dataPathFilms   = '../../data/films.json'
-    dataPathReviews = '../../data/reviews.json'
+    defaultConfigParameters = {
+        'dataPathFilms'   : '../../data/films.json',
+        'dataPathReviews' : '../../data/reviews.json'
+    }
     
-    DataAnalytics(dataPathFilms, dataPathReviews).main()
+    DataAnalytics(defaultConfigParameters).main()

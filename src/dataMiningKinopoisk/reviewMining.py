@@ -6,6 +6,7 @@ import threading
 
 from random import random
 from time import sleep
+from datetime import datetime as dt
 from bs4 import BeautifulSoup as bs
 
 class ReviewMining(object):
@@ -21,12 +22,28 @@ class ReviewMining(object):
         'User-Agent' : 'Chrome/120.0.0.0 YaBrowser/24.1.0.0',
         'Referer'    : 'https://sso.kinopoisk.ru/'
     }
+    
+    Month = {
+        'января'   : '01',
+        'февраля'  : '02',
+        'марта'    : '03',
+        'апреля'   : '04',
+        'мая'      : '05',
+        'июня'     : '06',
+        'июля'     : '07',
+        'августа'  : '08',
+        'сентября' : '09',
+        'октября'  : '10',
+        'ноября'   : '11',
+        'декабря'  : '12'
+    }
 
-    def __init__(self, dataPathFilms, dataPathReviews, threads, reviewInPage):
-        self.dataPathFilms   = dataPathFilms
-        self.dataPathReviews = dataPathReviews
-        self.reviewInPage    = reviewInPage
-        self.threads         = threads
+    def __init__(self, configParameters):
+        
+        self.dataPathFilms   = configParameters['dataPathFilms']
+        self.dataPathReviews = configParameters['dataPathReviews']
+        self.threads         = configParameters['threads']
+        self.reviewInPage    = configParameters['reviewInPage']
     
         self.lock = threading.Lock()
         
@@ -52,6 +69,15 @@ class ReviewMining(object):
             
         return IDArray
 
+    def reviewDateAndTime(self, textDate):
+        
+        monthKey = textDate.split(' ')[1]
+        
+        dateAndTimeStr = textDate.replace(monthKey, self.Month[monthKey])        
+        dateAndTimeDt  = dt.strptime(dateAndTimeStr, '%d %m %Y | %H:%M')
+
+        return dateAndTimeDt.strftime('%H:%M|%d.%m.%Y')
+
     def reviewParsingForPage(self, pageReviews):
         
         reviewInPageArray = []
@@ -59,10 +85,11 @@ class ReviewMining(object):
         for elem in pageReviews.findAll('div', itemprop = 'reviews'):
                     
             review = {
-                'author'     : elem.find('a', itemprop = 'name').text, 
-                'class'      : elem['class'][1].capitalize(),
-                'title'      : elem.find('p', class_ = 'sub_title').text.replace(u'\xa0', ' '), 
-                'reviewText' : elem.find('span', itemprop = 'reviewBody').text.replace('\n\r\n', ' ')
+                'author'      : elem.find('a', itemprop = 'name').text, 
+                'class'       : elem['class'][1].capitalize(),
+                'title'       : elem.find('p', class_ = 'sub_title').text.replace(u'\xa0', ' '),
+                'dateAndTime' : self.reviewDateAndTime(elem.find('span', class_ = 'date').text),
+                'reviewText'  : elem.find('span', itemprop = 'reviewBody').text.replace('\n\r\n', ' ')
             }
             
             reviewInPageArray.append(review)            
@@ -73,36 +100,37 @@ class ReviewMining(object):
         
         for ID in IDArray:
             
-            sleep(7.5 + random() * 10.0)
+            sleep(10.0 + random() * 15.0)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/reviews',
                                         headers = self.URLHeaders)
                 
             except requests.ConnectionError:
-                print('\n Error: Connection is broken!...')
+                with self.lock:
+                    print('\n Error: Connection is broken!...')
                 break
             
             if response.status_code != 200:
                 continue
             
             pageKinopoisk   = bs(response.content, features = 'html.parser')
-            reviewCountFind = pageKinopoisk.find('li', class_ = 'all').find('b')
+            reviewCountFind = pageKinopoisk.find('li', class_ = 'all')
 
-            if reviewCountFind is None:
-                print('\n Warning: Not fount count of reviews on the site...')
-                with self.lock:
-                    self.reviewMissing.append(f'{ID}|0')
+            if reviewCountFind is None:                
+                # with self.lock:
+                #    print(' Warning: Not fount count of reviews on the site...')
+                #    self.reviewMissing.append(f'{ID}|0')
                 continue
 
-            reviewCountFilm = int(reviewCountFind.text)
+            reviewCountFilm = int(reviewCountFind.find('b').text)
             reviewsForFilm  = []
+
+            # for page in range(1, reviewCountFilm // self.reviewInPage + 1):
 
             for page in range(1, 2):
 
-            #for page in range(1, reviewCountFilm // self.reviewInPage + 1):
-
-                sleep(7.5 + random() * 10.0)
+                sleep(10.0 + random() * 15.0)
             
                 try:
                     response = requests.get(self.KinopoiskURL + 
@@ -111,7 +139,8 @@ class ReviewMining(object):
                                             headers = self.URLHeaders)
                 
                 except requests.ConnectionError:
-                    print('\n Error: Connection is broken!...')
+                    with self.lock:
+                        print('\n Error: Connection is broken!...')
                     break
             
                 if response.status_code != 200:
@@ -144,7 +173,7 @@ class ReviewMining(object):
     
     def main(self):
 
-        print(f'\n\t The data is downloading to the file \"{self.dataPathReviews}\"...')
+        print(f'\n\t The data about reviews is downloading to the file \"{self.dataPathReviews}\"...\n')
 
         parts = self.threads
         threadReviewArray = []
@@ -169,15 +198,17 @@ class ReviewMining(object):
             json.dump(allReviewJSON, file, indent = 4,
                       ensure_ascii = False, separators = (',', ': '))
         
-        print('\n\t The data was downloaded successfully!\n')
+        print('\n\t The data about reviews was downloaded successfully!\n')
 
         return
 
 if __name__ == '__main__':
     
-    dataPathFilms   = '../../data/movies.json'
-    dataPathReviews = '../../data/reviews.json'
-    threads         = 4
-    reviewInPage    = 10
-
-    ReviewMining(dataPathFilms, dataPathReviews, threads, reviewInPage).main()
+    defaultConfigParameters = {
+        'dataPathFilms'   : '../../data/movies.json',
+        'dataPathReviews' : '../../data/reviews.json',
+        'threads'         : 4,
+        'reviewInPage'    : 10
+    }
+    
+    ReviewMining(defaultConfigParameters).main()
