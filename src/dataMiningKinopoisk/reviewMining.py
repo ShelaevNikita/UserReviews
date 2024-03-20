@@ -96,11 +96,17 @@ class ReviewMining(object):
 
         return reviewInPageArray
 
+    def userReviewClass(self, pageContent, reviewClass):        
+        return int(pageContent.find('li', class_ = reviewClass).find('b').text)
+
     def urlReviewParsing(self, IDArray):
         
+        firstID = IDArray[0]
+
         for ID in IDArray:
             
-            sleep(10.0 + random() * 15.0)
+            if (firstID != ID):
+                sleep(30.0 + random() * 15.0)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/reviews',
@@ -118,19 +124,27 @@ class ReviewMining(object):
             reviewCountFind = pageKinopoisk.find('li', class_ = 'all')
 
             if reviewCountFind is None:                
-                # with self.lock:
-                #    print(' Warning: Not fount count of reviews on the site...')
-                #    self.reviewMissing.append(f'{ID}|0')
+                with self.lock:
+                    print(' Warning: Not fount user reviews for this film...')
+                    self.reviewMissing.append(f'{ID}|0')
                 continue
 
             reviewCountFilm = int(reviewCountFind.find('b').text)
+            
+            reviewCountPos  = self.userReviewClass(pageKinopoisk, 'pos')
+            reviewCountNeg  = self.userReviewClass(pageKinopoisk, 'neg')
+            reviewCountNeut = self.userReviewClass(pageKinopoisk, 'neut')
+            
+            reviewPosAndNeg = float(pageKinopoisk.find('li', class_ = 'perc').find('b').text[:-1])
+            
             reviewsForFilm  = []
 
             # for page in range(1, reviewCountFilm // self.reviewInPage + 1):
 
             for page in range(1, 2):
 
-                sleep(10.0 + random() * 15.0)
+                if (page != 1):
+                    sleep(30.0 + random() * 15.0)
             
                 try:
                     response = requests.get(self.KinopoiskURL + 
@@ -162,6 +176,8 @@ class ReviewMining(object):
                 self.reviewJSONArray.append({
                     'filmID'        : ID,
                     'reviewMax'     : reviewCountFilm,
+                    'reviewPercent' : reviewPosAndNeg,
+                    'reviewClass'   : (reviewCountPos, reviewCountNeg, reviewCountNeut),
                     'reviewForFilm' : reviewCountForFilm,
                     'reviews'       : reviewsForFilm
                 })

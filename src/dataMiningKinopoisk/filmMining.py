@@ -35,8 +35,11 @@ class FilmMining(object):
         self.IDNotUsed     = []
         self.filmJSONArray = []
         
-    def checkKeyInData(self, dataJSON, dataKey):
+    def checkKeyInDataStr(self, dataJSON, dataKey):
         return dataJSON[dataKey].replace(u'\x39', '\'') if (dataKey in dataJSON) else '???'
+    
+    def checkKeyInDataArr(self, dataJSON, dataKey):
+        return dataJSON[dataKey] if (dataKey in dataJSON) else []
 
     def personNameAndID(self, personDict):
         return {
@@ -51,9 +54,9 @@ class FilmMining(object):
             'type'           : dataJSON['@type'],
             'URL'            : dataJSON['url'],
             'nameRU'         : dataJSON['name'],
-            'nameEN'         : self.checkKeyInData(dataJSON, 'alternateName'),
-            'headline'       : self.checkKeyInData(dataJSON, 'alternativeHeadline'),
-            'contentRating'  : self.checkKeyInData(dataJSON, 'contentRating'),
+            'nameEN'         : self.checkKeyInDataStr(dataJSON, 'alternateName'),
+            'headline'       : self.checkKeyInDataStr(dataJSON, 'alternativeHeadline'),
+            'contentRating'  : self.checkKeyInDataStr(dataJSON, 'contentRating'),
             
             'family'         : dataJSON['isFamilyFriendly'] if ('isFamilyFriendly' in dataJSON) else None,
             
@@ -74,16 +77,17 @@ class FilmMining(object):
 
         filmJSON['year']        = int(dataJSON['datePublished'])
         
-        filmJSON['description'] = dataJSON['description'].replace(u'\xa0', ' ').replace(u'\x97', '--') \
-            if ('description' in dataJSON) else '???'
+        filmJSON['description'] = \
+            dataJSON['description'].replace('\n', '').replace(u'\xa0', ' ').replace(u'\x97', '--') \
+                if ('description' in dataJSON) else '???'
         
-        filmJSON['genre']       = [ genre.capitalize() for genre in dataJSON['genre'] ]
-        filmJSON['country']     = dataJSON['countryOfOrigin']
-        filmJSON['awards']      = dataJSON['award'] if ('award' in dataJSON) else []
+        filmJSON['genre']       = [genre.capitalize() for genre in dataJSON['genre']]
+        filmJSON['country']     = self.checkKeyInDataArr(dataJSON, 'countryOfOrigin')
+        filmJSON['awards']      = self.checkKeyInDataArr(dataJSON, 'award')
         
-        filmJSON['producer']    = [ self.personNameAndID(person) for person in dataJSON['producer'] ]
-        filmJSON['director']    = [ self.personNameAndID(person) for person in dataJSON['director'] ]
-        filmJSON['actor']       = [ self.personNameAndID(person) for person in dataJSON['actor']    ]     
+        filmJSON['producer']    = [self.personNameAndID(person) for person in dataJSON['producer']]
+        filmJSON['director']    = [self.personNameAndID(person) for person in dataJSON['director']]
+        filmJSON['actor']       = [self.personNameAndID(person) for person in dataJSON['actor']]     
         
         with self.lock:
             self.filmJSONArray.append(filmJSON)
@@ -92,9 +96,12 @@ class FilmMining(object):
 
     def urlFilmParsing(self, IDArray):
         
+        firstID = IDArray[0]
+
         for ID in IDArray:
             
-            sleep(10.0 + random() * 15.0)
+            if (firstID != ID):
+                sleep(30.0 + random() * 15.0)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/',
@@ -135,6 +142,15 @@ class FilmMining(object):
         IDArray = IDArray[:self.takeFilms] if self.takeFilms > 0 else IDArray
         
         # IDArray.append(435)
+        # IDArray.append(258687)
+        # IDArray.append(326)
+        # IDArray.append(448)
+        # IDArray.append(535341)       
+        # IDArray.append(404900)
+        # IDArray.append(89540)
+        # IDArray.append(464963)
+        # IDArray.append(79848)
+        # IDArray.append(253245)
 
         IDArrays = [IDArray[i::parts] for i in range(parts)]
 

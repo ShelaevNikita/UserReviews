@@ -35,10 +35,10 @@ class mainClassUserReview(object):
         
         for line in dataParameters[3:]:
             
-            splitParameter = line.replace('\n', ' ').replace(' ', '').split('=')
+            splitParameter = line.replace('\n', ' ').replace('\t', ' ').split('=')
             
-            parameterName  = splitParameter[0]
-            parameterValue = splitParameter[1]
+            parameterName  = splitParameter[0].strip()
+            parameterValue = splitParameter[1].strip()
             
             try:
                 parameterValue = int(parameterValue)
@@ -52,11 +52,11 @@ class mainClassUserReview(object):
 
     def orderWork(self):
 
-        filmMining.FilmMining(self.configParameters).main()
+        # filmMining.FilmMining(self.configParameters).main()
     
-        reviewMining.ReviewMining(self.configParameters).main()
+        # reviewMining.ReviewMining(self.configParameters).main()
 
-        # dataAnalytics.DataAnalytics(self.configParameters).main()
+        dataAnalytics.DataAnalytics(self.configParameters).main()
 
         return
 
