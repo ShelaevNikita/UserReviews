@@ -1,9 +1,9 @@
-#	#	#	#	#	#	#	#	#	#	#	 #
+#   #   #   #   #   #   #   #   #   #   #    #
 # This is configuration file for UserReviews #
-#	#	#	#	#	#	#	#	#	#	#	 #
+#   #   #   #   #   #   #   #   #   #   #    #
 	dataPathFilms   = ./data/movies.json
 	dataPathReviews = ./data/reviews.json
-	threads         = 4
+	threads         = 1
 	maxID           = 650000
-	takeFilms       = 50
-	reviewInPage    = 50
+	takeFilms       = 25
+	reviewInPage    = 100

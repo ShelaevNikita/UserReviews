@@ -101,7 +101,7 @@ class FilmMining(object):
         for ID in IDArray:
             
             if (firstID != ID):
-                sleep(30.0 + random() * 15.0)
+                sleep(45.0 + random() * 15.0)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/',

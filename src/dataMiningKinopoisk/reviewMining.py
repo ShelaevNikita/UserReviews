@@ -106,7 +106,7 @@ class ReviewMining(object):
         for ID in IDArray:
             
             if (firstID != ID):
-                sleep(30.0 + random() * 15.0)
+                sleep(45.0 + random() * 15.0)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/reviews',
@@ -139,12 +139,9 @@ class ReviewMining(object):
             
             reviewsForFilm  = []
 
-            # for page in range(1, reviewCountFilm // self.reviewInPage + 1):
+            for page in range(1, reviewCountFilm // self.reviewInPage + 1):
 
-            for page in range(1, 2):
-
-                if (page != 1):
-                    sleep(30.0 + random() * 15.0)
+                sleep(45.0 + random() * 15.0)
             
                 try:
                     response = requests.get(self.KinopoiskURL + 

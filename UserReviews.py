@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import src.dataMiningKinopoisk.filmMining   as filmMining
-import src.dataMiningKinopoisk.reviewMining as reviewMining
-import src.dataAnalytics                    as dataAnalytics
+import src.dataMiningKinopoisk.FilmMining   as filmMining
+import src.dataMiningKinopoisk.ReviewMining as reviewMining
+import src.Visualization                    as visualization
+import src.DataAnalytics                    as dataAnalytics
 
 class mainClassUserReview(object):
     
@@ -55,14 +56,16 @@ class mainClassUserReview(object):
         # filmMining.FilmMining(self.configParameters).main()
     
         # reviewMining.ReviewMining(self.configParameters).main()
+        
+        # dataAnalytics.DataAnalytics(self.configParameters).main()
 
-        dataAnalytics.DataAnalytics(self.configParameters).main()
+        visualization.VisualizationReviews(self.configParameters).main()
 
         return
 
     def main(self):
 
-        print('\n\t\t Hello in app \"UserReview\"!')
+        print('\n\t\t Hello in app \"UserReview\"!\n')
         
         # self.inputConfigFile()
         self.splitConfigFile()
