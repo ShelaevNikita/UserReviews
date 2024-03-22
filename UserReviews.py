@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import src.dataMiningKinopoisk.FilmMining   as filmMining
-import src.dataMiningKinopoisk.ReviewMining as reviewMining
-import src.Visualization                    as visualization
-import src.DataAnalytics                    as dataAnalytics
+import src.dataMiningKinopoisk.FilmMining   as FM
+import src.dataMiningKinopoisk.ReviewMining as RM
+import src.Visualization                    as Vis
+import src.DataAnalytics                    as DAs
 
 class mainClassUserReview(object):
     
@@ -53,13 +53,13 @@ class mainClassUserReview(object):
 
     def orderWork(self):
 
-        # filmMining.FilmMining(self.configParameters).main()
+        # FMFilmMining(self.configParameters).main()
     
-        # reviewMining.ReviewMining(self.configParameters).main()
+        # RM.ReviewMining(self.configParameters).main()
         
-        # dataAnalytics.DataAnalytics(self.configParameters).main()
+        # DAs.DataAnalytics(self.configParameters).main()
 
-        visualization.VisualizationReviews(self.configParameters).main()
+        Vis.VisualizationReviews(self.configParameters).main()
 
         return
 

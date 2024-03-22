@@ -2,6 +2,8 @@
 
 import json
 
+from datetime import datetime as dt
+
 class DataAnalytics(object):
     
     def __init__(self, configParameters):
@@ -27,12 +29,6 @@ class DataAnalytics(object):
         reviewJSON = self.getJSONFromFile(self.dataPathReviews)
 
         return (filmJSON, reviewJSON)
-
-    def sortBySecondElem(self, elem):
-        return elem[1]
-    
-    def sortByThirdElem(self, elem):
-        return elem[2]
 
     def fillFilmIDAndName(self, filmJSON):
         
@@ -60,27 +56,19 @@ class DataAnalytics(object):
                     
                 else:
                     paramDict[elem] = 1
-        
-        paramArr = [(param, value) for (param, value) in paramDict.items()]
 
-        return sorted(paramArr, key = self.sortBySecondElem, reverse = True)
+        return list(paramDict.items())
 
-    def sortFilmByRating(self, filmJSON):
+    def countFilmRating(self, filmJSON):
         
         filmRatingArr = []
         
         for film in filmJSON['filmArray']:
             filmRatingArr.append((film['nameRU'], film['ratingValue'], film['ratingCount']))
-            
-        highFilmRatingValue = sorted(filmRatingArr, key = self.sortBySecondElem, reverse = True)
-        highFilmRatingCount = sorted(filmRatingArr, key = self.sortByThirdElem,  reverse = True)
         
-        return (
-            [(film[0], film[1]) for film in highFilmRatingValue],
-            [(film[0], film[2]) for film in highFilmRatingCount]
-        )
+        return filmRatingArr
     
-    def sortFilmByTime(self, filmJSON):
+    def countFilmTime(self, filmJSON):
         
         movieTimeArr  = []
         serialTimeArr = []
@@ -92,23 +80,15 @@ class DataAnalytics(object):
             
             else:
                 movieTimeArr.append((film['nameRU'], film['timeForEpisode']))
-                
-        highSerialEpisodesCount = sorted(serialTimeArr, key = self.sortBySecondElem, reverse = True)
-        highSerialAllTime       = sorted(serialTimeArr, key = self.sortByThirdElem,  reverse = True)
-        highMovieTime           = sorted(movieTimeArr,  key = self.sortBySecondElem, reverse = True)
 
-        return (
-            highMovieTime,
-            [(serial[0], serial[1]) for serial in highSerialEpisodesCount],
-            [(serial[0], serial[2]) for serial in highSerialAllTime]
-        )
+        return (movieTimeArr, serialTimeArr)
 
-    def filmPerson(self, filmJSON, typeOfPerson):
+    def countFilmPerson(self, filmJSON, typeOfPerson):
 
         personIDAndName   = {}
         personIDAndRating = {}
         
-        personIDAndRatingArr = []
+        personRatingArr   = []
 
         for film in filmJSON['filmArray']:
             
@@ -131,48 +111,67 @@ class DataAnalytics(object):
             personFilmCount = len(personRating)
             personRatingAvg = round(sum(personRating) / personFilmCount, 3)
 
-            personIDAndRatingArr.append((personID, personIDAndName[personID], 
-                                         personRatingAvg, personFilmCount))
+            personRatingArr.append((personID, personIDAndName[personID],
+                                    personRatingAvg, personFilmCount))
 
-        return sorted(personIDAndRatingArr, key = self.sortByThirdElem,  reverse = True)
+        return personRatingArr
 
-    def sortReviewByCount(self, reviewJSON):
+    def countFilmReview(self, reviewJSON):
 
-        reviewArr = []
+        reviewCountArr = []
 
-        for review in reviewJSON['reviewArray']:
+        for film in reviewJSON['reviewArray']:
             
-            reviewMax   = review['reviewMax']
-            reviewClass = review['reviewClass']
-            
-            filmID = review['filmID']
+            reviewMax   = film['reviewMax']
+            reviewClass = film['reviewClass']           
+            filmID      = film['filmID']
             
             reviewPercWithoutNeut = (
                 round((reviewClass[0] + reviewClass[2] // 2) / reviewMax * 100, 3),
-                round(reviewClass[0] / (reviewMax - reviewClass[2]) * 100, 3),
+                round( reviewClass[0] / (reviewMax - reviewClass[2])     * 100, 3),
             )
             
-            reviewArr.append((filmID, reviewMax, review['reviewPercent'], reviewClass,
-                              self.filmIDAndName[filmID], reviewPercWithoutNeut))
-
-        highReviewCount   = sorted(reviewArr, key = self.sortBySecondElem, reverse = True)
-        highReviewPercent = sorted(reviewArr, key = self.sortByThirdElem,  reverse = True)
+            reviewCountArr.append((filmID, self.filmIDAndName[filmID], reviewMax, reviewClass,
+                                   film['reviewPercent'], reviewPercWithoutNeut))
         
-        return (
-            [(review[4], review[1]) for review in highReviewCount],
-            [(review[4], review[2]) for review in highReviewPercent]
-        )
+        return reviewCountArr
+
+    def countReviewDate(self, reviewJSON, filmID):
+        
+        reviewDateCount = {}
+
+        for film in reviewJSON['reviewArray']:
+            
+           if film['filmID'] != filmID:
+               continue
+           
+           for review in film['reviews']:
+               
+               reviewDateAndTime = dt.strptime(review['dateAndTime'], '%H:%M|%d.%m.%Y')
+               
+               keyReview = reviewDateAndTime.strftime('%m.%Y')
+               
+               if keyReview in reviewDateCount:
+                   reviewDateCount[keyReview] += 1
+                   
+               else:
+                   reviewDateCount[keyReview] = 1
+
+           break
+
+        return [(dt.strptime(key, '%m.%Y'), value) 
+                for (key, value) in reviewDateCount.items()]
 
     def filmAnalytics(self, filmJSON):
         
-        filmGenreArr  = self.countFilmParam(filmJSON, 'genre')
-        filmYearArr   = self.countFilmParam(filmJSON, 'year', False)
+        filmGenreArr     = self.countFilmParam(filmJSON, 'genre')
+        filmYearArr      = self.countFilmParam(filmJSON, 'year', False)
         
-        filmRatingArr = self.sortFilmByRating(filmJSON)
+        filmRatingArr    = self.countFilmRating(filmJSON)
 
-        filmTimeArr   = self.sortFilmByTime(filmJSON)
+        filmTimeArr      = self.countFilmTime(filmJSON)
         
-        filmPersonActors = self.filmPerson(filmJSON, 'actor')
+        filmPersonActors = self.countFilmPerson(filmJSON, 'actor')
 
         print(filmGenreArr)
         print(filmYearArr)
@@ -184,9 +183,12 @@ class DataAnalytics(object):
 
     def reviewAnalytics(self, reviewJSON):
         
-        reviewClassArr = self.sortReviewByCount(reviewJSON)
+        reviewClassArr = self.countFilmReview(reviewJSON)
+        
+        reviewDateCount = self.countReviewDate(reviewJSON, 435)
         
         print(reviewClassArr)
+        print(reviewDateCount)
 
         return
 

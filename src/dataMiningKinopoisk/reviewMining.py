@@ -44,6 +44,7 @@ class ReviewMining(object):
         self.dataPathReviews = configParameters['dataPathReviews']
         self.threads         = configParameters['threads']
         self.reviewInPage    = configParameters['reviewInPage']
+        self.sleepTime       = configParameters['sleepTime']
     
         self.lock = threading.Lock()
         
@@ -89,7 +90,7 @@ class ReviewMining(object):
                 'class'       : elem['class'][1].capitalize(),
                 'title'       : elem.find('p', class_ = 'sub_title').text.replace(u'\xa0', ' '),
                 'dateAndTime' : self.reviewDateAndTime(elem.find('span', class_ = 'date').text),
-                'reviewText'  : elem.find('span', itemprop = 'reviewBody').text.replace('\n\r\n', ' ')
+                'reviewText'  : elem.find('span', itemprop = 'reviewBody').text.replace('\r', ' ').replace('\n', ' ')
             }
             
             reviewInPageArray.append(review)            
@@ -105,8 +106,8 @@ class ReviewMining(object):
 
         for ID in IDArray:
             
-            if (firstID != ID):
-                sleep(45.0 + random() * 15.0)
+            if (ID != firstID):
+                sleep(self.sleepTime + random() * self.sleepTime)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/reviews',
@@ -139,9 +140,9 @@ class ReviewMining(object):
             
             reviewsForFilm  = []
 
-            for page in range(1, reviewCountFilm // self.reviewInPage + 1):
+            for page in range(1, reviewCountFilm // self.reviewInPage + 2):
 
-                sleep(45.0 + random() * 15.0)
+                sleep(self.sleepTime + random() * self.sleepTime)
             
                 try:
                     response = requests.get(self.KinopoiskURL + 
@@ -221,7 +222,8 @@ if __name__ == '__main__':
         'dataPathFilms'   : '../../data/movies.json',
         'dataPathReviews' : '../../data/reviews.json',
         'threads'         : 4,
-        'reviewInPage'    : 10
+        'reviewInPage'    : 100,
+        'sleepTime'       : 30
     }
     
     ReviewMining(defaultConfigParameters).main()

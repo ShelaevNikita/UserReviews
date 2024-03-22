@@ -28,6 +28,7 @@ class FilmMining(object):
         self.threads       = configParameters['threads']
         self.maxID         = configParameters['maxID']
         self.takeFilms     = configParameters['takeFilms']
+        self.sleepTime     = configParameters['sleepTime']
     
         self.lock = threading.Lock()
         
@@ -100,8 +101,8 @@ class FilmMining(object):
 
         for ID in IDArray:
             
-            if (firstID != ID):
-                sleep(45.0 + random() * 15.0)
+            if (ID != firstID):
+                sleep(self.sleepTime + random() * self.sleepTime)
 
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/',
@@ -139,6 +140,7 @@ class FilmMining(object):
         
         IDArray = list(range(self.maxID + 1))
         shuffle(IDArray)
+        
         IDArray = IDArray[:self.takeFilms] if self.takeFilms > 0 else IDArray
         
         # IDArray.append(435)
@@ -183,7 +185,8 @@ if __name__ == '__main__':
         'dataPathFilms' : '../../data/movies.json',
         'threads'       : 4,
         'maxID'         : 700000,
-        'takeFilms'     : 100
+        'takeFilms'     : 100,
+        'sleepTime'     : 30
     }
 
     FilmMining(defaultConfigParameters).main()

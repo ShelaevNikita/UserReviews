@@ -3,7 +3,8 @@
 #   #   #   #   #   #   #   #   #   #   #    #
 	dataPathFilms   = ./data/movies.json
 	dataPathReviews = ./data/reviews.json
-	threads         = 1
+	threads         = 4
 	maxID           = 650000
+	sleepTime       = 30
 	takeFilms       = 25
 	reviewInPage    = 100
