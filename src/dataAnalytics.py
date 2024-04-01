@@ -162,6 +162,48 @@ class DataAnalytics(object):
         return [(dt.strptime(key, '%m.%Y'), value) 
                 for (key, value) in reviewDateCount.items()]
 
+    def reviewLenText(self, reviewJSON, filmID):
+        
+        reviewGood = []
+        reviewNeg  = []
+        reviewNeut = []
+
+        notUsedSymbols = [
+            '.',  ',', '–', '-', '—', 
+            ';', '\'', ':', '«', '»',
+            '(',  ')', '!', '?'
+        ]
+
+        for film in reviewJSON['reviewArray']:
+            
+            if film['filmID'] != filmID:
+                continue
+           
+            for review in film['reviews']:
+
+                reviewText  = review['reviewText']
+                reviewClass = review['class']
+
+                for symbol in notUsedSymbols:
+                    reviewText = reviewText.replace(symbol, '')
+                
+                reviewText = reviewText.replace('…', ' ').replace('/', ' ')
+
+                reviewTextArr = reviewText.lower().split()
+
+                if reviewClass == 'Good':
+                    reviewGood.append(len(reviewTextArr))
+                
+                elif reviewClass == 'Neutral':
+                    reviewNeut.append(len(reviewTextArr))
+                    
+                else:
+                    reviewNeg.append(len(reviewTextArr))
+
+            break
+
+        return (reviewGood, reviewNeg, reviewNeut)
+
     def filmAnalytics(self, filmJSON):
         
         filmGenreArr     = self.countFilmParam(filmJSON, 'genre')
@@ -183,18 +225,23 @@ class DataAnalytics(object):
 
     def reviewAnalytics(self, reviewJSON):
         
-        reviewClassArr = self.countFilmReview(reviewJSON)
+        reviewClassArr   = self.countFilmReview(reviewJSON)
         
-        reviewDateCount = self.countReviewDate(reviewJSON, 435)
+        reviewDateCount  = self.countReviewDate(reviewJSON, 435)
+        
+        reviewLenTextArr = self.reviewLenText(reviewJSON, 435)
         
         print(reviewClassArr)
         print(reviewDateCount)
+        print(reviewLenTextArr)
 
         return
 
     def main(self):
         
         filmJSON, reviewJSON = self.getFilmAndReviewJSON()
+
+        self.fillFilmIDAndName(filmJSON)
 
         self.filmAnalytics(filmJSON)
 

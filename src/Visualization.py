@@ -12,11 +12,12 @@ class VisualizationReviews():
         'Распределение фильмов/сериалов по жанрам',
         'Распределение фильмов/сериалов по странам',
         'Распределение фильмов/сериалов по году производства',       
-        'Фильмы/сериалы с самым высоким рейтингом',
+        'Фильмы/сериалы с самым высоким рейтингом пользователей',
         'Фильмы/сериалы с самой высокой продолжительностью',
         'Актёрский состав с самым высоким рейтингом',
         'Фильмы/сериалы с самым большим количеством отзывов',
-        'Распределение отзывов к фильму по месяцам'
+        'Распределение отзывов к фильму/сериалу по месяцам',
+        'Количество слов в отзыве в зависимости от его класса'
     ]
 
     def __init__(self, configParameters):
@@ -296,8 +297,50 @@ class VisualizationReviews():
 
                 fig = go.Figure(go.Scatter(x = x, y = y, text = y))
                 
+                title = 'Распределение отзывов к фильму \"' + filmName + '\" по месяцам'
+
+                fig.update_layout(title = title, yaxis_title = 'Количество отзывов в месяц')
+
+            elif (indicator == self.FilterKeys[8]):
+
+                if 6 not in self.indicatorArrDict:
+                    self.countFilmReviewInDict(reviewJSON)
+                
+                if 8 not in self.indicatorArrDict:
+                    self.indicatorArrDict[8] = [(elem[0], elem[1])
+                                                for elem in self.indicatorArrDict[6][0]]
+                    
+                offsetArr = takeElem - 1
+                lengthArr = len(self.indicatorArrDict[8])
+                
+                if offsetArr >= lengthArr:
+                    offsetArr = lengthArr - 1
+                    
+                filmID, filmName = self.indicatorArrDict[8][offsetArr]
+
+                reviewGood, reviewNeg, reviewNeut = \
+                    self.DataAnalytics.reviewLenText(reviewJSON, filmID)
+                
+                reviewGood.sort(reverse = True)
+                reviewNeut.sort(reverse = True)
+                reviewNeg.sort( reverse = True)
+
+                xGood = [x for x in range(len(reviewGood))]
+                xNeut = [x for x in range(len(reviewNeut))]
+                xNeg  = [x for x in range(len(reviewNeg))]
+
+                goodAvg = round(sum(reviewGood) / len(reviewGood), 1)
+                neutAvg = round(sum(reviewNeut) / len(reviewNeut), 1)
+                negAvg  = round(sum(reviewNeg)  /  len(reviewNeg), 1)
+
+                fig = go.Figure([
+                    go.Scatter(x = xGood, y = reviewGood, name = f'Положительные: {goodAvg}'),
+                    go.Scatter(x = xNeut, y = reviewNeut, name = f'Нейтрельные: {neutAvg}'),
+                    go.Scatter(x = xNeg,  y = reviewNeg,  name = f'Отрицательные: {negAvg}')
+                ])
+
                 fig.update_layout(title = indicator + ' (\"' + filmName + '\")',
-                                  yaxis_title = 'Количество отзывов в месяц')
+                                  yaxis_title = 'Количество слов в отзыве')
 
             fig.update_layout(title_x = 0.5, width = 1500, height = 700, autosize = True)
             
