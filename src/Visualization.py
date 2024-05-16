@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 
 from dash import Dash, dcc, html, Input, Output, no_update
 
-from src import DataAnalytics
+from src import DataAnalytics as DA
 
 class VisualizationReviews():
     
@@ -17,51 +17,43 @@ class VisualizationReviews():
         'Актёрский состав с самым высоким рейтингом',
         'Фильмы/сериалы с самым большим количеством отзывов',
         'Распределение отзывов к фильму/сериалу по месяцам',
-        'Количество слов в отзыве в зависимости от его класса'
+        'Среднее количество слов в отзыве в зависимости от его класса'
     ]
 
     def __init__(self, configParameters):
-        
         self.app = Dash(__name__)
         
-        self.DataAnalytics = DataAnalytics.DataAnalytics(configParameters)
+        self.DataAnalytics    = DA.DataAnalytics(configParameters)
         
         self.indicatorArrDict = {}
 
-    def splitArrToXAndY(self, tupleFromArr, first = 0, second = 1):
-        
-        x = []
-        y = []
+    def splitArrToXAndY(self, tupleFromArr, first = 0, second = 1):      
+        X = [tupleFrom[first]  for tupleFrom in tupleFromArr]
+        Y = [tupleFrom[second] for tupleFrom in tupleFromArr]
+        return (X, Y)
 
-        for tupleFrom in tupleFromArr:
-            x.append(tupleFrom[first])
-            y.append(tupleFrom[second])
+    def splitPersonToBar(self, personArr):       
+        X      = [person[1] for person in personArr]
+        Y      = [person[2] for person in personArr]
+        textXY = [f'{person[2]} {person[3]}' for person in personArr]
+        return (X, Y, textXY)
 
-        return (x, y)
-
-    def splitPersonToBar(self, personArr):
-        
-        x    = []
-        y    = []
-        text = []
-
-        for person in personArr:
-            x.append(person[1])
-            y.append(person[2])
-            text.append(f'{person[2]} {person[3]}')
-
-        return (x, y, text)
-
-    def countFilmReviewInDict(self, reviewJSON):
-        
+    def countFilmReviewInDict(self, reviewJSON):        
         reviewClassArr = self.DataAnalytics.countFilmReview(reviewJSON)
 
         reviewCount    = sorted(reviewClassArr, key = lambda elem: elem[2], reverse = True)
         reviewPercent  = sorted(reviewClassArr, key = lambda elem: elem[4], reverse = True)
                     
         self.indicatorArrDict[6] = (reviewCount, reviewPercent)
-
+        self.indicatorArrDict[7] = [(elem[0], elem[1]) for elem in self.indicatorArrDict[6][0]]
         return
+    
+    def takeFilmFromOffset(self, takeElem, reviewJSON):        
+        if 6 not in self.indicatorArrDict:
+            self.countFilmReviewInDict(reviewJSON)
+                
+        offsetArr = min(takeElem, len(self.indicatorArrDict[7])) - 1
+        return self.indicatorArrDict[7][offsetArr]
 
     def layout(self, filmJSON, reviewJSON):
 
@@ -114,58 +106,50 @@ class VisualizationReviews():
                 return no_update
 
             if (indicator == self.FilterKeys[0]):
-
-                if 0 not in self.indicatorArrDict:
-                    
+                if 0 not in self.indicatorArrDict:                   
                     filmGenreArr = self.DataAnalytics.countFilmParam(filmJSON, 'genre')
                     filmGenreArr.sort(key = lambda elem: elem[1], reverse = True)
                     
                     self.indicatorArrDict[0] = filmGenreArr
 
-                x, y = self.splitArrToXAndY(self.indicatorArrDict[0][:takeElem])
+                X, Y = self.splitArrToXAndY(self.indicatorArrDict[0][:takeElem])
 
-                fig = go.Figure(go.Bar(x = x, y = y, text = y, textposition = 'auto'))
+                fig = go.Figure(go.Bar(x = X, y = Y, text = Y, textposition = 'auto'))
                 
                 fig.update_layout(title = indicator,
                                   yaxis_title = 'Количество фильмов/сериалов',
                                   xaxis_title = 'Название жанра')
             
             elif (indicator == self.FilterKeys[1]):
-
-                if 1 not in self.indicatorArrDict:
-                    
+                if 1 not in self.indicatorArrDict:                  
                     filmCountryArr = self.DataAnalytics.countFilmParam(filmJSON, 'country')
                     filmCountryArr.sort(key = lambda elem: elem[1], reverse = True)
                     
                     self.indicatorArrDict[1] = filmCountryArr
 
-                x, y = self.splitArrToXAndY(self.indicatorArrDict[1][:takeElem])
+                X, Y = self.splitArrToXAndY(self.indicatorArrDict[1][:takeElem])
 
-                fig = go.Figure(go.Bar(x = x, y = y, text = y, textposition = 'auto'))
+                fig = go.Figure(go.Bar(x = X, y = Y, text = Y, textposition = 'auto'))
                 
                 fig.update_layout(title = indicator,
                                   yaxis_title = 'Количество фильмов/сериалов',
                                   xaxis_title = 'Страна производства')
 
             elif (indicator == self.FilterKeys[2]):
-
-                if 2 not in self.indicatorArrDict:
-                    
+                if 2 not in self.indicatorArrDict:                   
                     filmYearArr = self.DataAnalytics.countFilmParam(filmJSON, 'year', False)
                     filmYearArr.sort(key = lambda elem: elem[1], reverse = True)
                     
                     self.indicatorArrDict[2] = filmYearArr
 
-                x, y = self.splitArrToXAndY(self.indicatorArrDict[2][:takeElem])
+                X, Y = self.splitArrToXAndY(self.indicatorArrDict[2][:takeElem])
 
-                fig = go.Figure(go.Bar(x = x, y = y, text = y, textposition = 'auto'))
+                fig = go.Figure(go.Bar(x = X, y = Y, text = Y, textposition = 'auto'))
                 
                 fig.update_layout(title = indicator, yaxis_title = 'Количество фильмов/сериалов')
                 
             elif (indicator == self.FilterKeys[3]):
-
-                if 3 not in self.indicatorArrDict:
-                    
+                if 3 not in self.indicatorArrDict:                
                     filmRatingArr = self.DataAnalytics.countFilmRating(filmJSON)
                     
                     filmRatingValue = sorted(filmRatingArr, key = lambda elem: elem[1], reverse = True)
@@ -189,9 +173,7 @@ class VisualizationReviews():
                                   yaxis_title = 'Значение / Количество')
 
             elif (indicator == self.FilterKeys[4]):
-
-                if 4 not in self.indicatorArrDict:
-                    
+                if 4 not in self.indicatorArrDict:                   
                     movieTimeArr, serialTimeArr = self.DataAnalytics.countFilmTime(filmJSON)
                     movieTimeArr.sort(key = lambda elem: elem[1], reverse = True)
 
@@ -219,9 +201,7 @@ class VisualizationReviews():
                                   yaxis_title = 'Время / Количество')
             
             elif (indicator == self.FilterKeys[5]):
-
-                if 5 not in self.indicatorArrDict:
-                    
+                if 5 not in self.indicatorArrDict:                  
                     filmProd = self.DataAnalytics.countFilmPerson(filmJSON, 'producer')
                     filmDir  = self.DataAnalytics.countFilmPerson(filmJSON, 'director')
                     filmAct  = self.DataAnalytics.countFilmPerson(filmJSON, 'actor')
@@ -251,12 +231,11 @@ class VisualizationReviews():
                                   yaxis_title = 'Рейтинг')
             
             elif (indicator == self.FilterKeys[6]):
-
                 if 6 not in self.indicatorArrDict:
                     self.countFilmReviewInDict(reviewJSON)               
                 
                 reviewClassArr = self.indicatorArrDict[6]
-
+                
                 xCount, yCount = self.splitArrToXAndY(reviewClassArr[0][:takeElem],
                                                       first = 1, second = 2)
                 
@@ -273,87 +252,57 @@ class VisualizationReviews():
                 fig.update_layout(barmode = 'group', title = indicator,
                                   yaxis_title = 'Количество / %')
 
-            elif (indicator == self.FilterKeys[7]):
+            elif (indicator == self.FilterKeys[7]):                   
+                filmID, filmName = self.takeFilmFromOffset(takeElem, reviewJSON)
 
-                if 6 not in self.indicatorArrDict:
-                    self.countFilmReviewInDict(reviewJSON)
-                
-                if 7 not in self.indicatorArrDict:
-                    self.indicatorArrDict[7] = [(elem[0], elem[1])
-                                                for elem in self.indicatorArrDict[6][0]]
-                    
-                offsetArr = takeElem - 1
-                lengthArr = len(self.indicatorArrDict[7])
-                
-                if offsetArr >= lengthArr:
-                    offsetArr = lengthArr - 1
-                    
-                filmID, filmName = self.indicatorArrDict[7][offsetArr]
-
-                reviewDateArr = self.DataAnalytics.countReviewDate(reviewJSON, filmID)
+                reviewDateArr    = self.DataAnalytics.countReviewDate(reviewJSON, filmID)
                 reviewDateArr.sort(key = lambda elem: elem[0], reverse = True)
 
-                x, y = self.splitArrToXAndY(reviewDateArr)
+                reviewWithWindow = self.DataAnalytics.reviewDateWithWindow(reviewDateArr)
+                reviewPredict    = self.DataAnalytics.fitLinearRegressionForReview(reviewWithWindow)
 
-                fig = go.Figure(go.Scatter(x = x, y = y, text = y))
+                initX, initY = self.splitArrToXAndY(reviewDateArr)
+                mediX, mediY = self.splitArrToXAndY(reviewWithWindow)
+                predX, predY = self.splitArrToXAndY(reviewPredict)
+
+                fig = go.Figure([
+                    go.Scatter(x = initX, y = initY, name = 'Исходные данные'),
+                    go.Scatter(x = mediX, y = mediY, name = 'Усреднённые данные'),
+                    go.Scatter(x = predX, y = predY, name = 'Предсказание')    
+                ])
                 
                 title = 'Распределение отзывов к фильму \"' + filmName + '\" по месяцам'
 
                 fig.update_layout(title = title, yaxis_title = 'Количество отзывов в месяц')
+            
+            elif (indicator == self.FilterKeys[8]):                                
+                filmID, filmName = self.takeFilmFromOffset(takeElem, reviewJSON)
 
-            elif (indicator == self.FilterKeys[8]):
-
-                if 6 not in self.indicatorArrDict:
-                    self.countFilmReviewInDict(reviewJSON)
+                reviewClass = self.DataAnalytics.reviewLenText(reviewJSON, filmID)
                 
-                if 8 not in self.indicatorArrDict:
-                    self.indicatorArrDict[8] = [(elem[0], elem[1])
-                                                for elem in self.indicatorArrDict[6][0]]
-                    
-                offsetArr = takeElem - 1
-                lengthArr = len(self.indicatorArrDict[8])
+                minReviews = [min(reviewClass[i]) for i in range(3)]
+                maxReviews = [max(reviewClass[i]) for i in range(3)]
+                lenReviews = [len(reviewClass[i]) for i in range(3)]
                 
-                if offsetArr >= lengthArr:
-                    offsetArr = lengthArr - 1
-                    
-                filmID, filmName = self.indicatorArrDict[8][offsetArr]
+                avgReviews = [round(sum(reviewClass[i]) / lenReviews[i], 1) for i in range(3)]
 
-                reviewGood, reviewNeg, reviewNeut = \
-                    self.DataAnalytics.reviewLenText(reviewJSON, filmID)
-                
-                reviewGood.sort(reverse = True)
-                reviewNeut.sort(reverse = True)
-                reviewNeg.sort( reverse = True)
+                X       = ['Положительные', 'Нейтральные', 'Отрицательные']
+                Y       = [avgReviews[i] for i in range(3)]
+                textXY  = [f'{avgReviews[i]}: от {minReviews[i]} до {maxReviews[i]} из {lenReviews[i]}' for i in range(3)]
 
-                xGood = [x for x in range(len(reviewGood))]
-                xNeut = [x for x in range(len(reviewNeut))]
-                xNeg  = [x for x in range(len(reviewNeg))]
-
-                goodAvg = round(sum(reviewGood) / len(reviewGood), 1)
-                neutAvg = round(sum(reviewNeut) / len(reviewNeut), 1)
-                negAvg  = round(sum(reviewNeg)  /  len(reviewNeg), 1)
-
-                fig = go.Figure([
-                    go.Scatter(x = xGood, y = reviewGood, name = f'Положительные: {goodAvg}'),
-                    go.Scatter(x = xNeut, y = reviewNeut, name = f'Нейтрельные: {neutAvg}'),
-                    go.Scatter(x = xNeg,  y = reviewNeg,  name = f'Отрицательные: {negAvg}')
-                ])
+                fig = go.Figure(go.Bar(x = X, y = Y, text = textXY, textposition = 'auto'))
 
                 fig.update_layout(title = indicator + ' (\"' + filmName + '\")',
-                                  yaxis_title = 'Количество слов в отзыве')
+                                  yaxis_title = 'Среднее количество слов в отзыве')
 
             fig.update_layout(title_x = 0.5, width = 1500, height = 700, autosize = True)
             
             return fig
 
-    def main(self):
-        
+    def main(self):        
         filmJSON, reviewJSON = self.DataAnalytics.getFilmAndReviewJSON()
-        
-        self.DataAnalytics.fillFilmIDAndName(filmJSON)
 
-        self.layout(filmJSON, reviewJSON)
-        
+        self.layout(filmJSON, reviewJSON)      
         self.app.run_server(host = 'localhost', port = 8050)
         
         return

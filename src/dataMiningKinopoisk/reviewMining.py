@@ -38,25 +38,21 @@ class ReviewMining(object):
         'декабря'  : '12'
     }
 
-    def __init__(self, configParameters):
-        
+    def __init__(self, configParameters):      
         self.dataPathFilms   = configParameters['dataPathFilms']
         self.dataPathReviews = configParameters['dataPathReviews']
         self.threads         = configParameters['threads']
-        self.reviewInPage    = configParameters['reviewInPage']
+        self.reviewInPage    = min(100, configParameters['reviewInPage'])
         self.sleepTime       = configParameters['sleepTime']
     
         self.lock = threading.Lock()
         
         self.reviewCount     = 0
-
         self.reviewMissing   = []
         self.reviewJSONArray = []
 
-    def getIDFilms(self):
-        
-        IDArray = []
-        
+    def getIDFilms(self):       
+        IDArray = []        
         try:
             with open(self.dataPathFilms, 'r', encoding = 'utf-8') as file:
                 resultJSON = json.loads(file.read(), strict = False)
@@ -70,19 +66,14 @@ class ReviewMining(object):
             
         return IDArray
 
-    def reviewDateAndTime(self, textDate):
-        
-        monthKey = textDate.split(' ')[1]
-        
+    def reviewDateAndTime(self, textDate):    
+        monthKey       = textDate.split(' ')[1]     
         dateAndTimeStr = textDate.replace(monthKey, self.Month[monthKey])        
         dateAndTimeDt  = dt.strptime(dateAndTimeStr, '%d %m %Y | %H:%M')
-
         return dateAndTimeDt.strftime('%H:%M|%d.%m.%Y')
 
-    def reviewParsingForPage(self, pageReviews):
-        
+    def reviewParsingForPage(self, pageReviews):     
         reviewInPageArray = []
-
         for elem in pageReviews.findAll('div', itemprop = 'reviews'):
                     
             review = {
@@ -100,12 +91,9 @@ class ReviewMining(object):
     def userReviewClass(self, pageContent, reviewClass):        
         return int(pageContent.find('li', class_ = reviewClass).find('b').text)
 
-    def urlReviewParsing(self, IDArray):
-        
+    def urlReviewParsing(self, IDArray):      
         firstID = IDArray[0]
-
-        for ID in IDArray:
-            
+        for ID in IDArray:          
             if (ID != firstID):
                 sleep(self.sleepTime + random() * self.sleepTime)
 
@@ -123,7 +111,7 @@ class ReviewMining(object):
             
             pageKinopoisk   = bs(response.content, features = 'html.parser')
             reviewCountFind = pageKinopoisk.find('li', class_ = 'all')
-
+            
             if reviewCountFind is None:                
                 with self.lock:
                     print(' Warning: Not fount user reviews for this film...')
@@ -141,9 +129,7 @@ class ReviewMining(object):
             reviewsForFilm  = []
 
             for page in range(1, reviewCountFilm // self.reviewInPage + 2):
-
-                sleep(self.sleepTime + random() * self.sleepTime)
-            
+                sleep(self.sleepTime + random() * self.sleepTime)           
                 try:
                     response = requests.get(self.KinopoiskURL + 
                                             f'{ID}/reviews/ord/date/status/all/' + 
@@ -186,10 +172,8 @@ class ReviewMining(object):
         return
     
     def main(self):
-
         print(f'\n\t The data about reviews is downloading to the file \"{self.dataPathReviews}\"...\n')
-
-        parts = self.threads
+        parts             = self.threads
         threadReviewArray = []
         
         IDArrays = [self.getIDFilms()[i::parts] for i in range(parts)]

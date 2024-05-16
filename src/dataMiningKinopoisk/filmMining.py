@@ -23,7 +23,6 @@ class FilmMining(object):
     }
 
     def __init__(self, configParameters):
-
         self.dataPathFilms = configParameters['dataPathFilms']
         self.threads       = configParameters['threads']
         self.maxID         = configParameters['maxID']
@@ -49,7 +48,6 @@ class FilmMining(object):
         }
 
     def makeFilmJSON(self, dataJSON):
-
         filmJSON = {
             'ID'             : int(dataJSON['url'].split('/')[4]),
             'type'           : dataJSON['@type'],
@@ -82,25 +80,22 @@ class FilmMining(object):
             dataJSON['description'].replace('\n', '').replace(u'\xa0', ' ').replace(u'\x97', '--') \
                 if ('description' in dataJSON) else '???'
         
-        filmJSON['genre']       = [genre.capitalize() for genre in dataJSON['genre']]
-        filmJSON['country']     = self.checkKeyInDataArr(dataJSON, 'countryOfOrigin')
-        filmJSON['awards']      = self.checkKeyInDataArr(dataJSON, 'award')
+        filmJSON['genre']    = [genre.capitalize() for genre in dataJSON['genre']]
+        filmJSON['country']  = self.checkKeyInDataArr(dataJSON, 'countryOfOrigin')
+        filmJSON['awards']   = self.checkKeyInDataArr(dataJSON, 'award')
         
-        filmJSON['producer']    = [self.personNameAndID(person) for person in dataJSON['producer']]
-        filmJSON['director']    = [self.personNameAndID(person) for person in dataJSON['director']]
-        filmJSON['actor']       = [self.personNameAndID(person) for person in dataJSON['actor']]     
+        filmJSON['producer'] = [self.personNameAndID(person) for person in dataJSON['producer']]
+        filmJSON['director'] = [self.personNameAndID(person) for person in dataJSON['director']]
+        filmJSON['actor']    = [self.personNameAndID(person) for person in dataJSON['actor']]     
         
         with self.lock:
             self.filmJSONArray.append(filmJSON)
 
         return
 
-    def urlFilmParsing(self, IDArray):
-        
+    def urlFilmParsing(self, IDArray):       
         firstID = IDArray[0]
-
-        for ID in IDArray:
-            
+        for ID in IDArray:          
             if (ID != firstID):
                 sleep(self.sleepTime + random() * self.sleepTime)
 
@@ -119,8 +114,7 @@ class FilmMining(object):
                 continue
             
             pageKinopoisk = bs(response.content, features = 'html.parser')
-            jsonFind = pageKinopoisk.find('script', type = 'application/ld+json')
-
+            jsonFind      = pageKinopoisk.find('script', type = 'application/ld+json')
             if jsonFind is None:               
                 with self.lock:
                     print(' Warning: Not fount JSON on the site...')
@@ -132,30 +126,15 @@ class FilmMining(object):
         return
     
     def main(self):
-
         print(f'\n\t The data about films is downloading to the file \"{self.dataPathFilms}\"...\n')
-
-        parts = self.threads
-        threadFilmArray = []
-        
-        IDArray = list(range(self.maxID + 1))
+        parts           = self.threads
+        threadFilmArray = []      
+        IDArray         = list(range(self.maxID + 1))
         shuffle(IDArray)
         
-        IDArray = IDArray[:self.takeFilms] if self.takeFilms > 0 else IDArray
-        
-        # IDArray.append(435)
-        # IDArray.append(258687)
-        # IDArray.append(326)
-        # IDArray.append(448)
-        # IDArray.append(535341)       
-        # IDArray.append(404900)
-        # IDArray.append(89540)
-        # IDArray.append(464963)
-        # IDArray.append(79848)
-        # IDArray.append(253245)
-
+        IDArray  = IDArray[:self.takeFilms] if self.takeFilms > 0 else IDArray
         IDArrays = [IDArray[i::parts] for i in range(parts)]
-
+        
         for i in range(parts):
             thr = threading.Thread(target = self.urlFilmParsing, args = (IDArrays[i],))
             threadFilmArray.append(thr)
