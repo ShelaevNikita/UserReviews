@@ -3,8 +3,10 @@ __pycache__/
 *.sln
 *.pyproj
 
-# JSON files
-*.json
+# Files
+log/
+data/
+memcached/
 
 # Distribution / packaging
 .vs/

@@ -1,28 +1,38 @@
 #!/usr/bin/env python3
 
 import requests
-import json
 import threading
+import logging
 
-from random import random
-from time import sleep
+from typing   import Dict, List, Tuple, Union, Any
+from random   import random
+from time     import sleep
 from datetime import datetime as dt
-from bs4 import BeautifulSoup as bs
+from bs4      import BeautifulSoup as bs
+from pymongo  import MongoClient
 
+from dataClass.ReviewDataClass import Review, ReviewForFilm
+
+# Класс для скачивания данных с помощью Web-Scrapping
+#   о пользовательских отзывах к различным фильмам / сериалам с сервиса "КиноПоиск"
 class ReviewMining(object):
     
+    # Proxy-сервера для обхода блокировки сайта
     Proxies = {
         'http'  : 'http://10.10.1.10:3128',
         'https' : 'http://10.10.1.10:1080'
     }
 
+    # URL-адрес сервиса "КиноПоиск"
     KinopoiskURL = 'https://www.kinopoisk.ru/film/'
     
+    # Используемые заголовки HTTPS-запроса
     URLHeaders   = {
         'User-Agent' : 'Chrome/120.0.0.0 YaBrowser/24.1.0.0',
         'Referer'    : 'https://sso.kinopoisk.ru/'
     }
     
+    # Словарь для преобразования названия месяца в его порядковый номер
     Month = {
         'января'   : '01',
         'февраля'  : '02',
@@ -38,176 +48,196 @@ class ReviewMining(object):
         'декабря'  : '12'
     }
 
-    def __init__(self, configParameters):      
-        self.dataPathFilms   = configParameters['dataPathFilms']
+    # Инициализация класса
+    def __init__(self, configParameters: Dict[str, Union[int, str]],
+                 mongoClient: MongoClient, reviewFilmPage: Dict[int, List[int]]):
+        
+        self.databaseName    = configParameters['databaseName']
         self.dataPathReviews = configParameters['dataPathReviews']
         self.threads         = configParameters['threads']
-        self.reviewInPage    = min(100, configParameters['reviewInPage'])
         self.sleepTime       = configParameters['sleepTime']
     
+        self.collection      = mongoClient[self.databaseName][self.dataPathReviews]
+
+        self.reviewFilmPage  = reviewFilmPage
+        
         self.lock = threading.Lock()
         
-        self.reviewCount     = 0
-        self.reviewMissing   = []
-        self.reviewJSONArray = []
-
-    def getIDFilms(self):       
-        IDArray = []        
-        try:
-            with open(self.dataPathFilms, 'r', encoding = 'utf-8') as file:
-                resultJSON = json.loads(file.read(), strict = False)
-                
-        except FileNotFoundError:
-            print(f'\n Error: Not found file \"{self.dataPathFilms}\"!')
-            return IDArray           
-        
-        for film in resultJSON['filmArray']:
-            IDArray.append(film['ID'])
-            
-        return IDArray
-
-    def reviewDateAndTime(self, textDate):    
+        logging.basicConfig(
+            filename = '../log/dataMining.log',
+            format   = '%(asctime)s | %(levelname)s: %(message)s',
+            filemode = 'w+'
+        )       
+        self.logger = logging.getLogger()
+    
+    # Преобразование строки с временем пользовательского отзыва в нужный формат
+    def reviewDateAndTime(self, textDate: str) -> str:    
         monthKey       = textDate.split(' ')[1]     
         dateAndTimeStr = textDate.replace(monthKey, self.Month[monthKey])        
         dateAndTimeDt  = dt.strptime(dateAndTimeStr, '%d %m %Y | %H:%M')
         return dateAndTimeDt.strftime('%H:%M|%d.%m.%Y')
 
-    def reviewParsingForPage(self, pageReviews):     
+    # Получение нового пользовательского отзыва
+    def createNewReview(self, pageElem: Any) -> Review:
+        reviewTitleInit       = pageElem.find('p', class_ = 'sub_title').text.replace(u'\xa0', ' ')
+        reviewTextInit        = pageElem.find('span', itemprop = 'reviewBody').text
+
+        newReview             = Review()
+        newReview.author      = pageElem.find('a', itemprop = 'name').text
+        newReview.title       = reviewTitleInit if (len(reviewTitleInit) > 0) else '?'
+        newReview.dateAndTime = self.reviewDateAndTime(pageElem.find('span', class_ = 'date').text)
+        newReview.reviewText  = reviewTextInit.encode('utf-8', errors = 'replace').decode('utf-8').replace('\r', '')
+        
+        reviewClass = pageElem['class'][1]
+        if   reviewClass == 'neutral':
+            newReview.reviewClass = 1
+         
+        elif reviewClass == 'bad':
+            newReview.reviewClass = 2
+
+        return newReview
+
+    # Скачивание всех пользовательских отзывов со страницы сайта
+    def reviewParsingForPage(self, pageReviews: bs) -> List[Review]:
         reviewInPageArray = []
         for elem in pageReviews.findAll('div', itemprop = 'reviews'):
-                    
-            review = {
-                'author'      : elem.find('a', itemprop = 'name').text, 
-                'class'       : elem['class'][1].capitalize(),
-                'title'       : elem.find('p', class_ = 'sub_title').text.replace(u'\xa0', ' '),
-                'dateAndTime' : self.reviewDateAndTime(elem.find('span', class_ = 'date').text),
-                'reviewText'  : elem.find('span', itemprop = 'reviewBody').text.replace('\r', ' ').replace('\n', ' ')
-            }
-            
-            reviewInPageArray.append(review)            
+            reviewInPageArray.append(self.createNewReview(elem))            
 
         return reviewInPageArray
 
-    def userReviewClass(self, pageContent, reviewClass):        
-        return int(pageContent.find('li', class_ = reviewClass).find('b').text)
-
-    def urlReviewParsing(self, IDArray):      
-        firstID = IDArray[0]
-        for ID in IDArray:          
-            if (ID != firstID):
-                sleep(self.sleepTime + random() * self.sleepTime)
-
-            try:
-                response = requests.get(self.KinopoiskURL + f'{ID}/reviews',
-                                        headers = self.URLHeaders)
+    # Заполнение общих полей в классе ReviewForFilm
+    def getCommonReviewInfo(self, filmID: int) -> Tuple[ReviewForFilm, List[int]]:
+        try:
+            response = requests.get(self.KinopoiskURL + f'{filmID}/reviews',
+                                    headers = self.URLHeaders)
                 
-            except requests.ConnectionError:
-                with self.lock:
-                    print('\n Error: Connection is broken!...')
-                break
+        except requests.ConnectionError:
+            with self.lock:
+                self.logger.error(f'{filmID} -> Connection is broken! | review')
             
-            if response.status_code != 200:
-                continue
+            return [ReviewForFilm(), []]
             
-            pageKinopoisk   = bs(response.content, features = 'html.parser')
-            reviewCountFind = pageKinopoisk.find('li', class_ = 'all')
+        if response.status_code != 200:
+            return [ReviewForFilm(), []]
             
-            if reviewCountFind is None:                
-                with self.lock:
-                    print(' Warning: Not fount user reviews for this film...')
-                    self.reviewMissing.append(f'{ID}|0')
-                continue
+        pageKinopoisk   = bs(response.content, features = 'html.parser')
+        reviewCountFind = pageKinopoisk.find('li', class_ = 'all')
+            
+        if reviewCountFind is None:                
+            with self.lock:
+                self.logger.warning(f'{filmID} -> Not found JSON on the site! | review')
 
-            reviewCountFilm = int(reviewCountFind.find('b').text)
-            
-            reviewCountPos  = self.userReviewClass(pageKinopoisk, 'pos')
-            reviewCountNeg  = self.userReviewClass(pageKinopoisk, 'neg')
-            reviewCountNeut = self.userReviewClass(pageKinopoisk, 'neut')
-            
-            reviewPosAndNeg = float(pageKinopoisk.find('li', class_ = 'perc').find('b').text[:-1])
-            
-            reviewsForFilm  = []
+            return [ReviewForFilm(), []]
 
-            for page in range(1, reviewCountFilm // self.reviewInPage + 2):
-                sleep(self.sleepTime + random() * self.sleepTime)           
+        reviewCountMax = int(reviewCountFind.find('b').text)
+
+        newReviewForFilm               = ReviewForFilm()
+        newReviewForFilm._id           = filmID
+        newReviewForFilm.reviewMax     = reviewCountMax
+        
+        newReviewForFilm.countGood     =   int(pageKinopoisk.find('li', class_ = 'pos').find('b').text)
+        newReviewForFilm.countNeutral  =   int(pageKinopoisk.find('li', class_ = 'neg').find('b').text)
+        newReviewForFilm.countNegative =   int(pageKinopoisk.find('li', class_ = 'neut').find('b').text)
+        newReviewForFilm.reviewPercent = float(pageKinopoisk.find('li', class_ = 'perc').find('b').text[:-1])
+        
+        return [newReviewForFilm, list(range(1, (reviewCountMax + 99) // 100 + 1))]
+
+    # Добавление новой записи в MongoDB
+    def reviewToMongoDB(self, review: ReviewForFilm, flagCreate: bool):
+        reviewToDict = review.toDict()
+        with self.lock:
+            if flagCreate:
+                self.collection.insert_one(reviewToDict)
+                
+            else:               
+                self.collection.update_one({ '_id'  : reviewToDict['_id'] },
+                                           { '$set' : { 'pages'  : reviewToDict['pages'],
+                                                       'reviews' : reviewToDict['reviews'] }})                
+            print(' Review:', reviewToDict['_id'])           
+        return
+
+    # Скачивание необходимых данных с сервиса "КиноПоиск"
+    def urlReviewParsing(self, reviewFilmPage: List[Tuple[int, List[int]]]):
+        for (filmID, pages) in reviewFilmPage:
+            if filmID != reviewFilmPage[0][0]:
+                sleep((1 + random()) * self.sleepTime)
+                
+            listPages  = pages
+            flagCreate = True
+            if len(pages) == 0:
+                newReviewForFilm, listPages = self.getCommonReviewInfo(filmID)
+                
+            else:
+                flagCreate = False
+                with self.lock:
+                    newReviewForFilm = ReviewForFilm(**self.collection.find_one({ '_id' : filmID }))
+                    
+            for page in listPages:
+                if page != listPages[0]:
+                    sleep((1 + random()) * self.sleepTime)
+                    
                 try:
                     response = requests.get(self.KinopoiskURL + 
-                                            f'{ID}/reviews/ord/date/status/all/' + 
-                                            f'perpage/{self.reviewInPage}/page/{page}/',
+                                            f'{filmID}/reviews/ord/date/status/all/' + 
+                                            f'perpage/200/page/{page}/',
                                             headers = self.URLHeaders)
                 
                 except requests.ConnectionError:
                     with self.lock:
-                        print('\n Error: Connection is broken!...')
-                    break
+                        self.logger.error(f'{filmID} -> Connection is broken! | review')
+                    
+                    return
             
                 if response.status_code != 200:
                     continue
 
-                pageReviews = bs(response.content, features = 'html.parser')
-
+                pageReviews   = bs(response.content, features = 'html.parser')               
                 reviewsInPage = self.reviewParsingForPage(pageReviews)
-                
                 if len(reviewsInPage) == 0:  
                     with self.lock:
-                        self.reviewMissing.append(f'{ID}|{page}')
+                        self.logger.warning(f'{filmID} -> Not found JSON on the page {page}! | review')
                         
-                reviewsForFilm += reviewsInPage
-            
-            reviewCountForFilm = len(reviewsForFilm)
+                    continue
 
-            with self.lock:
-                self.reviewJSONArray.append({
-                    'filmID'        : ID,
-                    'reviewMax'     : reviewCountFilm,
-                    'reviewPercent' : reviewPosAndNeg,
-                    'reviewClass'   : (reviewCountPos, reviewCountNeg, reviewCountNeut),
-                    'reviewForFilm' : reviewCountForFilm,
-                    'reviews'       : reviewsForFilm
-                })
-
-            with self.lock:
-                self.reviewCount += reviewCountForFilm
+                newReviewForFilm.pages.append(page)
+                newReviewForFilm.reviews += reviewsInPage
+                
+            self.reviewToMongoDB(newReviewForFilm, flagCreate)
 
         return
     
+    # Главная функция класса, запускающая несколько параллельных потоков на скачивание данных
     def main(self):
-        print(f'\n\t The data about reviews is downloading to the file \"{self.dataPathReviews}\"...\n')
-        parts             = self.threads
-        threadReviewArray = []
-        
-        IDArrays = [self.getIDFilms()[i::parts] for i in range(parts)]
+        print('\t The data about reviews is downloading...')
+        self.logger.debug('The data about reviews is downloading...')
 
-        for i in range(parts):
-            thr = threading.Thread(target = self.urlReviewParsing, args = (IDArrays[i],))
+        threadReviewArray = []
+        reviewFilmPageArr = list(self.reviewFilmPage.items())
+        reviewFilmPageThr = [reviewFilmPageArr[i::self.threads] for i in range(self.threads)]
+
+        for i in range(self.threads):
+            thr = threading.Thread(target = self.urlReviewParsing, args = (reviewFilmPageThr[i],))
             threadReviewArray.append(thr)
             thr.start()
         
         for thr in threadReviewArray:
             thr.join()
         
-        allReviewJSON = {
-            'reviewCount'   : self.reviewCount,
-            'reviewMissing' : self.reviewMissing,
-            'reviewArray'   : self.reviewJSONArray
-        }
-
-        with open(self.dataPathReviews, 'w', encoding = 'utf-8') as file:
-            json.dump(allReviewJSON, file, indent = 4,
-                      ensure_ascii = False, separators = (',', ': '))
-        
-        print('\n\t The data about reviews was downloaded successfully!\n')
-
+        print('\t The data about reviews was downloaded successfully!')
+        self.logger.debug('The data about reviews was downloaded successfully!')
         return
 
 if __name__ == '__main__':
     
     defaultConfigParameters = {
-        'dataPathFilms'   : '../../data/movies.json',
-        'dataPathReviews' : '../../data/reviews.json',
+        'databaseName'    : 'userReviews',
+        'dataPathReviews' : 'reviews',
         'threads'         : 4,
-        'reviewInPage'    : 100,
         'sleepTime'       : 30
     }
+
+    mongoClient = MongoClient('mongodb://localhost:27017/')
+    IDArray     = {435:[], 258687:[], 326:[], 448:[], 535341:[], 
+                   404900:[], 89540:[], 464963:[], 79848:[], 253245:[]}
     
-    ReviewMining(defaultConfigParameters).main()
+    ReviewMining(defaultConfigParameters, mongoClient, IDArray).main()

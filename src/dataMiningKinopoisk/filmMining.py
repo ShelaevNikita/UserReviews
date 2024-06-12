@@ -1,171 +1,182 @@
 #!/usr/bin/env python3
 
 import requests
-import json
 import threading
+import logging
 
-from random import random, shuffle
-from time import sleep
-from bs4 import BeautifulSoup as bs
+from typing  import Dict, List, Union
+from random  import random
+from time    import sleep
+from json    import loads
+from bs4     import BeautifulSoup as bs
+from pymongo import MongoClient
 
+from dataClass.FilmDataClass import Person, Film
+
+# Класс для скачивания данных с помощью Web-Scrapping
+#   о различных фильмах / сериалах с сервиса "КиноПоиск"
 class FilmMining(object):
     
+    # Proxy-сервера для обхода блокировки сайта
     Proxies = {
         'http'  : 'http://10.10.1.10:3128',
         'https' : 'http://10.10.1.10:1080'
     }
 
+    # URL-адрес сервиса "КиноПоиск"
     KinopoiskURL = 'https://www.kinopoisk.ru/film/'
     
+    # Используемые заголовки HTTPS-запроса
     URLHeaders   = {
         'User-Agent' : 'Chrome/120.0.0.0 YaBrowser/24.1.0.0',
         'Referer'    : 'https://sso.kinopoisk.ru/'
     }
 
-    def __init__(self, configParameters):
+    # Инициализация класса
+    def __init__(self, configParameters: Dict[str, Union[int, str]],
+                 mongoClient: MongoClient, IDArray: List[int]):
+        
         self.dataPathFilms = configParameters['dataPathFilms']
+        self.databaseName  = configParameters['databaseName']
         self.threads       = configParameters['threads']
-        self.maxID         = configParameters['maxID']
-        self.takeFilms     = configParameters['takeFilms']
         self.sleepTime     = configParameters['sleepTime']
-    
+        
+        self.collection    = mongoClient[self.databaseName][self.dataPathFilms]
+
+        self.IDArray       = IDArray
+
         self.lock = threading.Lock()
         
-        self.filmMissing   = []
-        self.IDNotUsed     = []
-        self.filmJSONArray = []
-        
-    def checkKeyInDataStr(self, dataJSON, dataKey):
-        return dataJSON[dataKey].replace(u'\x39', '\'') if (dataKey in dataJSON) else '???'
+        logging.basicConfig(
+            filename = '../log/dataMining.log',
+            format   = '%(asctime)s | %(levelname)s: %(message)s',
+            filemode = 'w+'
+        )       
+        self.logger = logging.getLogger()
     
-    def checkKeyInDataArr(self, dataJSON, dataKey):
+    # Поиск информации по ключу в найденном JSON и возвращение строки
+    def checkKeyInDataStr(self, dataJSON: Dict[str, str], dataKey: str) -> str:
+        return dataJSON[dataKey].replace(u'\x39', '\'') if (dataKey in dataJSON) else '?'
+    
+    # Поиск информации по ключу в найденном JSON и возвращение списка строк
+    def checkKeyInDataArr(self, dataJSON: Dict[str, str], dataKey: str) -> List[str]:
         return dataJSON[dataKey] if (dataKey in dataJSON) else []
 
-    def personNameAndID(self, personDict):
-        return {
-            'ID'   : int(personDict['url'].split('/')[2]),
-            'name' : personDict['name']
-        }
+    # Преобразование словаря с информацией о человеке в класс Person
+    def dictToPerson(self, personDict: Dict[str, str]) -> Person:
+        newPerson            = Person()
+        newPerson._id        = int(personDict['url'].split('/')[2])
+        newPerson.personType = True if (personDict['@type'] == 'Person') else False
+        newPerson.name       = personDict['name']
+        return newPerson
 
-    def makeFilmJSON(self, dataJSON):
-        filmJSON = {
-            'ID'             : int(dataJSON['url'].split('/')[4]),
-            'type'           : dataJSON['@type'],
-            'URL'            : dataJSON['url'],
-            'nameRU'         : dataJSON['name'],
-            'nameEN'         : self.checkKeyInDataStr(dataJSON, 'alternateName'),
-            'headline'       : self.checkKeyInDataStr(dataJSON, 'alternativeHeadline'),
-            'contentRating'  : self.checkKeyInDataStr(dataJSON, 'contentRating'),
-            
-            'family'         : dataJSON['isFamilyFriendly'] if ('isFamilyFriendly' in dataJSON) else None,
-            
-            'timeForEpisode' : int(dataJSON['timeRequired']) if ('timeRequired' in dataJSON)      else -1,
-            'episodesCount'  : dataJSON['numberOfEpisodes']  if (dataJSON['@type'] == 'TVSeries') else -1
-        }
+    # Преобразование скаченного JSON в класс Film
+    def JSONToFilm(self, dataJSON: Dict[str, str]) -> Film:
+        newFilm                = Film()
+        newFilm._id            = int(dataJSON['url'].split('/')[4])
+        newFilm.filmType       = True if (dataJSON['@type'] == 'Movie') else False
+        newFilm.URL            = dataJSON['url']
         
-        filmJSON['allTime'] = filmJSON['timeForEpisode'] * filmJSON['episodesCount'] \
-            if (filmJSON['episodesCount'] > 0) else filmJSON['timeForEpisode']
-         
+        newFilm.nameRU         = self.checkKeyInDataStr(dataJSON, 'name')        
+        newFilm.nameEN         = self.checkKeyInDataStr(dataJSON, 'alternateName')
+        newFilm.headline       = self.checkKeyInDataStr(dataJSON, 'alternativeHeadline')
+        newFilm.contentRating  = self.checkKeyInDataStr(dataJSON, 'contentRating')
+        
+        newFilm.family         = int(dataJSON['isFamilyFriendly']) if ('isFamilyFriendly' in dataJSON) else 2
+        newFilm.timeForEpisode = int(dataJSON['timeRequired'])     if ('timeRequired' in dataJSON)     else 0
+        newFilm.episodesCount  = int(dataJSON['numberOfEpisodes']) if ('numberOfEpisodes' in dataJSON) else 1
+        
+        newFilm.year           = int(dataJSON['datePublished'])
+                 
         if ('aggregateRating' in dataJSON):
-            filmJSON['ratingValue'] = dataJSON['aggregateRating']['ratingValue']                                    
-            filmJSON['ratingCount'] = dataJSON['aggregateRating']['ratingCount']
+            newFilm.ratingValue = float(dataJSON['aggregateRating']['ratingValue'])            
+            newFilm.ratingCount = int(dataJSON['aggregateRating']['ratingCount'])     
+        
+        newFilm.description = dataJSON['description'].replace(u'\xa0', ' ').replace(u'\x97', '--') \
+                                if ('description' in dataJSON) else '?'
+        
+        newFilm.genres    = [genre.capitalize() for genre in dataJSON['genre']]
+        newFilm.countries = self.checkKeyInDataArr(dataJSON, 'countryOfOrigin')
+        newFilm.awards    = self.checkKeyInDataArr(dataJSON, 'award')
+        
+        newFilm.producers = [self.dictToPerson(person) for person in dataJSON['producer']]
+        newFilm.directors = [self.dictToPerson(person) for person in dataJSON['director']]
+        newFilm.actors    = [self.dictToPerson(person) for person in dataJSON['actor']]
 
-        else:
-            filmJSON['ratingValue'] = 0.0
-            filmJSON['ratingCount'] = 0
+        return newFilm
 
-        filmJSON['year']        = int(dataJSON['datePublished'])
-        
-        filmJSON['description'] = \
-            dataJSON['description'].replace('\n', '').replace(u'\xa0', ' ').replace(u'\x97', '--') \
-                if ('description' in dataJSON) else '???'
-        
-        filmJSON['genre']    = [genre.capitalize() for genre in dataJSON['genre']]
-        filmJSON['country']  = self.checkKeyInDataArr(dataJSON, 'countryOfOrigin')
-        filmJSON['awards']   = self.checkKeyInDataArr(dataJSON, 'award')
-        
-        filmJSON['producer'] = [self.personNameAndID(person) for person in dataJSON['producer']]
-        filmJSON['director'] = [self.personNameAndID(person) for person in dataJSON['director']]
-        filmJSON['actor']    = [self.personNameAndID(person) for person in dataJSON['actor']]     
-        
+    # Добавление новой записи в MongoDB
+    def filmToMongoDB(self, film: Film):
         with self.lock:
-            self.filmJSONArray.append(filmJSON)
-
+            checkFilm = self.collection.find_one({ '_id' : film._id })
+            if checkFilm is None:
+                self.collection.insert_one(film.toDict())
+                
+            print(' Film:', film._id)
         return
 
-    def urlFilmParsing(self, IDArray):       
-        firstID = IDArray[0]
-        for ID in IDArray:          
-            if (ID != firstID):
-                sleep(self.sleepTime + random() * self.sleepTime)
-
+    # Скачивание необходимых данных с сервиса "КиноПоиск"
+    def urlFilmParsing(self, IDArray: int):
+        for ID in IDArray:
+            if ID != IDArray[0]:
+                sleep((1 + random()) * self.sleepTime)
+                
             try:
                 response = requests.get(self.KinopoiskURL + f'{ID}/',
                                         headers = self.URLHeaders)
                 
             except requests.ConnectionError:
                 with self.lock:
-                    print('\n Error: Connection is broken!...')
+                    self.logger.error(f'{ID} -> Connection is broken! | film')
+                    
                 break
             
             if response.status_code != 200:
-                with self.lock:
-                    self.IDNotUsed.append(ID)
                 continue
             
             pageKinopoisk = bs(response.content, features = 'html.parser')
             jsonFind      = pageKinopoisk.find('script', type = 'application/ld+json')
             if jsonFind is None:               
                 with self.lock:
-                    print(' Warning: Not fount JSON on the site...')
-                    self.filmMissing.append(ID)
+                    self.logger.warning(f'{ID} -> Not found JSON on the site! | film')
+                    
                 continue
 
-            self.makeFilmJSON(json.loads(jsonFind.text))
+            self.filmToMongoDB(self.JSONToFilm(loads(jsonFind.text)))
 
         return
     
+    # Главная функция класса, запускающая несколько параллельных потоков на скачивание данных
     def main(self):
-        print(f'\n\t The data about films is downloading to the file \"{self.dataPathFilms}\"...\n')
-        parts           = self.threads
-        threadFilmArray = []      
-        IDArray         = list(range(self.maxID + 1))
-        shuffle(IDArray)
+        print('\t The data about films is downloading...')
+        self.logger.debug('The data about films is downloading...')
+
+        threadFilmArray = []        
+        IDArrays        = [self.IDArray[i::self.threads] for i in range(self.threads)]
         
-        IDArray  = IDArray[:self.takeFilms] if self.takeFilms > 0 else IDArray
-        IDArrays = [IDArray[i::parts] for i in range(parts)]
-        
-        for i in range(parts):
+        for i in range(self.threads):
             thr = threading.Thread(target = self.urlFilmParsing, args = (IDArrays[i],))
             threadFilmArray.append(thr)
             thr.start()
         
         for thr in threadFilmArray:
             thr.join()
-        
-        allFilmJSON = {
-            'filmCount'     : len(self.filmJSONArray),
-            'filmIDNotUsed' : self.IDNotUsed,
-            'filmMissing'   : self.filmMissing,
-            'filmArray'     : self.filmJSONArray
-        }
 
-        with open(self.dataPathFilms, 'w', encoding = 'utf-8') as file:
-            json.dump(allFilmJSON, file, indent = 4,
-                      ensure_ascii = False, separators = (',', ': '))
-
-        print('\n\t The data about films was downloaded successfully!\n')
-
+        print('\t The data about films was downloaded successfully!')
+        self.logger.debug('The data about films was downloaded successfully!')
         return
 
 if __name__ == '__main__':
     
     defaultConfigParameters = {
-        'dataPathFilms' : '../../data/movies.json',
+        'databaseName'  : 'userReviews',
+        'dataPathFilms' : 'films',
         'threads'       : 4,
-        'maxID'         : 700000,
-        'takeFilms'     : 100,
         'sleepTime'     : 30
     }
 
-    FilmMining(defaultConfigParameters).main()
+    mongoClient = MongoClient('mongodb://localhost:27017/')
+    IDArray     = [435, 258687, 326, 448, 535341, 
+                   404900, 89540, 464963, 79848, 253245]
+
+    FilmMining(defaultConfigParameters, mongoClient, IDArray).main()

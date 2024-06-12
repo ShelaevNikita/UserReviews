@@ -1,0 +1,12 @@
+#   #   #   #   #   #   #   #   #   #   #   #   #   #   #    #
+# This is configuration file for Visualization microservice #
+#   #   #   #   #   #   #   #   #   #   #   #   #   #   #    #
+	pathMongoDB      = mongodb://localhost:27017/
+	databaseName     = userReviews
+	dataPathResult   = analytics
+	dataPathPredict  = predict
+	reviewWindowSize = 5
+	reviewValueUp    = 5
+	reviewDegree     = 7
+	lastDays         = 15
+	timeCache        = 60

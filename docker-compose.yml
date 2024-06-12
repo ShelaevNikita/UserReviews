@@ -1,0 +1,32 @@
+version: '3'
+services:
+    app:
+        build: .
+        command: nohup python UserReviews.py
+        volumes:
+          - ./app:/usr/src/app
+        ports: 
+          - '8050:8050'
+        depends_on:
+          - mongodb
+          - cache
+
+    mongodb:
+        restart: always
+        image: mongodb/mongodb-community-server:6.0-ubi8
+        ports:
+          - '27017:27017'
+        volumes:
+          - ./scripts:/docker-entrypoint-initdb.d
+          - type: bind
+            source: ./data
+            target: /data/db
+
+    cache:
+        restart: always
+        image: memcached
+        ports:
+          - '11211:11211'
+        entrypoint:
+          - memcached
+             

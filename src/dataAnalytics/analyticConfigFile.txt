@@ -1,0 +1,10 @@
+#   #   #   #   #   #   #   #   #   #   #   #   #   #   #    #
+# This is configuration file for Data Analytics microservice #
+#   #   #   #   #   #   #   #   #   #   #   #   #   #   #    #
+	pathMongoDB      = mongodb://localhost:27017/
+	databaseName     = userReviews
+	dataPathFilms    = films
+	dataPathReviews  = reviews
+	dataPathAnalytic = analytic
+	reviewWindowSize = 5
+	reviewValueUp    = 5

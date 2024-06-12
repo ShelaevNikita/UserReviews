@@ -1,0 +1,11 @@
+#    #   #   #   #   #   #   #   #   #   #   #   #   #    #
+# This is configuration file for Data Mining microservice #
+#    #   #   #   #   #   #   #   #   #   #   #   #   #    #
+    pathMongoDB     = mongodb://localhost:27017/
+	databaseName    = userReviews
+	dataPathFilms   = films
+	dataPathReviews = reviews
+	threads         = 4
+	maxID           = 5000000
+	takeFilms       = 10000
+	sleepTime       = 60
