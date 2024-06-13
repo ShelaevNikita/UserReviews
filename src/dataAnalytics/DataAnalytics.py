@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from itertools import filterfalse
 import logging
 
 from typing      import Dict, List, Union, Any, Tuple
