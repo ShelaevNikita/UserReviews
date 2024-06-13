@@ -15,9 +15,9 @@ class ClassDataMining(object):
     
     # Значения конфигурационного файла по умолчанию
     DefaultConfigParameters = {
-        'pathMongoDB'     : 'mongodb://localhost:27017/',
-        'databaseName'    : 'userReviews',
-        'dataPathFilms'   : 'films',
+      'pathMongoDB'     : 'mongodb://localhost:27017/',
+      'databaseName'    : 'userReviews',
+      'dataPathFilms'   : 'films',
 	    'dataPathReviews' : 'reviews',    
 	    'threads'         : 4,
 	    'maxID'           : 5000000,
@@ -27,18 +27,18 @@ class ClassDataMining(object):
     
     # Инициализация класса
     def __init__(self):       
-        self.configFile        = 'dataMiningKinopoisk/miningConfigFile.txt'   
+        self.configFile        = './src/dataMiningKinopoisk/miningConfigFile.txt'   
         self.configParameters  = self.DefaultConfigParameters
         
         self.collectionFilms   = None
         self.collectionReviews = None
 
         logging.basicConfig(
-            filename = '../log/dataMining.log',
+            filename = './log/dataMining.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )
-        self.logger     = logging.getLogger()   
+        self.logger  = logging.getLogger()   
     
     # Получение данных из конфигурационного файла
     def splitConfigFile(self):    
@@ -94,15 +94,15 @@ class ClassDataMining(object):
         for (filmID, reviewCount) in listFilmIDAndCount:
             if filmID not in listReviewIDs and reviewCount > 0:
                 reviewFilmPage[filmID] = []
-            
+        
         for review in self.collectionReviews.find():
-            if len(review['pages']) < ((review['reviewMax'] + 199) // 200):
+            if len(review['pages']) < ((review['reviewMax'] + 199) // 200):                
                 listPages = list(range(1, (review['reviewMax'] + 199) // 200 + 1))
                 for page in review['pages']:
                     listPages.remove(page)
                     
                 reviewFilmPage[review['_id']] = listPages
-
+                
         return reviewFilmPage
     
     # Последовательный вызов всех необходимых функций

@@ -8,8 +8,9 @@ from pymongo                 import MongoClient
 from datetime                import datetime as dt
 
 from sklearn.linear_model    import LinearRegression
-from sklearn.tree            import DecisionTreeRegressor
 from sklearn.preprocessing   import PolynomialFeatures
+from sklearn.tree            import DecisionTreeRegressor
+from sklearn.ensemble        import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing   import StandardScaler
 from sklearn.metrics         import mean_squared_error, r2_score
@@ -28,12 +29,13 @@ class DataPredict(object):
         'dataPathPredict'  : 'predict',
         'reviewWindowSize' : 5,
         'reviewValueUp'    : 5,
-        'reviewDegree'     : 7
+        'reviewDegree'     : 7,
+        'countTrees'       : 100,
     }
 
     # Инициализация класса
     def __init__(self):       
-        self.configFile         = 'dataPredict/predictConfigFile.txt'   
+        self.configFile         = './src/dataPredict/predictConfigFile.txt'   
         self.configParameters   = self.DefaultConfigParameters
         
         self.collectionFilms    = None
@@ -42,9 +44,9 @@ class DataPredict(object):
         self.collectionPredict  = None
 
         logging.basicConfig(
-            filename = '../log/dataPredict.log',
+            filename = './log/dataPredict.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )
         self.logger = logging.getLogger()
     
@@ -195,8 +197,8 @@ class DataPredict(object):
             else:
                 predictReviewDateUp.append((reviewDate[i][0], predictReviewValue[i]))
 
-        self.infoToMongoDB(f'PRReviewDate/{reviewID}/{degree}', predictReviewDate)
-        self.infoToMongoDB(f'PRReviewDateUp/{reviewID}/{degree}/{reviewValueUp}', predictReviewDateUp)
+        self.infoToMongoDB(f'PRReviewDate/{reviewID}', predictReviewDate)
+        self.infoToMongoDB(f'PRReviewDateUp/{reviewID}/{reviewValueUp}', predictReviewDateUp)
         return
 
     # Применение Полиномиальной регрессии для распределения пользовательских
@@ -220,11 +222,21 @@ class DataPredict(object):
     # Использование Дерева решений для распределения пользовательских
     #   отзывов по месяцам для конкретного фильма / сериала
     def decisionTreeForReview(self, reviewDate: List[Tuple[dt, int]], 
-                              reviewID: int, keyToDB: str):
+                              reviewID: int, keyToDB: str, keyTree = 0):
         
         XTrain, XTest, YTrain, YTest = self.prepareDataToPredict(reviewDate)
         
-        regressor          = DecisionTreeRegressor(random_state = 0)
+        if   (keyTree == 0):
+            regressor = DecisionTreeRegressor(random_state = 5)
+            
+        elif (keyTree == 1):
+            regressor = RandomForestRegressor(n_estimators = self.configParameters['countTrees'],
+                                              random_state = 10)
+            
+        elif (keyTree == 2):
+            regressor = GradientBoostingRegressor(n_estimators = self.configParameters['countTrees'],
+                                                  random_state = 15)
+
         reviewRegression   = regressor.fit(XTrain, YTrain)
         predictReviewValue = reviewRegression.predict(XTest)
 
@@ -234,15 +246,15 @@ class DataPredict(object):
         RMSE    = np.sqrt(mean_squared_error(predictReviewValue, np.append(YTrain, YTest)))
         R2Score = abs(r2_score(predictReviewValue, np.append(YTrain, YTest)))
         
-        self.logger.warning(f'decisionTree/{reviewID}/RMSE/{RMSE}')
-        self.logger.warning(f'decisionTree/{reviewID}/R2/{R2Score}')
+        self.logger.warning(f'{keyToDB}/{reviewID}/RMSE/{RMSE}')
+        self.logger.warning(f'{keyToDB}/{reviewID}/R2/{R2Score}')
 
         self.infoToMongoDB(f'{keyToDB}/{reviewID}', predictReviewDate)
         return
 
     # Применение Дерева решений для распределения пользовательских
     #   отзывов по месяцам для всех фильмов / сериалов
-    def decisionTreeForReviewInDB(self):
+    def decisionTreeForReviewInDB(self, keyTree = 0):
         reviewWindowSize = self.configParameters['reviewWindowSize']
         for review in self.collectionReviews.find():
             reviewID           = review['_id']
@@ -251,14 +263,34 @@ class DataPredict(object):
             if cursorReviewDateWW is None or len(cursorReviewDateWW['valuesParam']) < 5:
                 continue
             
-            self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID, 'DTReviewDateWW')
+            if   (keyTree == 0):
+                self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
+                                           'DTReviewDateWW', keyTree)
+                 
+            elif (keyTree == 1):
+                self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
+                                           'RTReviewDateWW', keyTree)
+                
+            elif (keyTree == 2):
+                self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
+                                           'GBReviewDateWW', keyTree)
             
             reviewDateKey    = f'reviewDate/{reviewID}'
             cursorReviewDate = self.collectionAnalytic.find_one({ 'nameParam' : reviewDateKey })
             if cursorReviewDate is None or len(cursorReviewDate['valuesParam']) < 5:
                 continue
             
-            self.decisionTreeForReview(cursorReviewDate['valuesParam'], reviewID, 'DTReviewDate')
+            if   (keyTree == 0):
+                self.decisionTreeForReview(cursorReviewDate['valuesParam'], reviewID,
+                                           'DTReviewDate', keyTree)
+                
+            elif (keyTree == 1):
+                self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
+                                           'RTReviewDate', keyTree)
+                
+            elif (keyTree == 2):
+                self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
+                                           'GBReviewDate', keyTree)
 
         return
 
@@ -273,24 +305,24 @@ class DataPredict(object):
 
     # Построение распределения для Дерева решений, поднятого на некоторое значение,
     #   количества пользовательских оценок по месяцам для всех фильмов / сериалов
-    def decisionTreeUpToDB(self, valueUp: int):
+    def decisionTreeUpToDB(self, valueUp: int, keyStr: List[str]):
         for filmReview in self.collectionReviews.find():
             filmID             = filmReview['_id']
-            decisionTreeNameWW = f'DTReviewDateWW/{filmID}'
+            decisionTreeNameWW = f'{keyStr[0]}/{filmID}'
             decisionTreeListWW = self.collectionPredict.find_one({ 'nameParam' : decisionTreeNameWW })
             if decisionTreeListWW is None:
                 continue
             
             self.decisionTreeUp(filmReview['_id'], valueUp,
-                                decisionTreeListWW['valuesParam'], 'DTReviewDateWWUp')
+                                decisionTreeListWW['valuesParam'], keyStr[2])
             
-            decisionTreeName = f'DTReviewDate/{filmID}'
+            decisionTreeName = f'{keyStr[1]}/{filmID}'
             decisionTreeList = self.collectionPredict.find_one({ 'nameParam' : decisionTreeName })
             if decisionTreeList is None:
                 continue
             
             self.decisionTreeUp(filmReview['_id'], valueUp,
-                                decisionTreeList['valuesParam'], 'DTReviewDateUp')
+                                decisionTreeList['valuesParam'], keyStr[3])
 
         return
 
@@ -299,8 +331,18 @@ class DataPredict(object):
     def regressionForReview(self):
         self.linearRegressionForReviewInDB()
         self.polynomialRegressionForReviewInDB()
-        self.decisionTreeForReviewInDB()
-        self.decisionTreeUpToDB(self.configParameters['reviewValueUp'])
+        self.decisionTreeForReviewInDB(0)
+        self.decisionTreeForReviewInDB(1)
+        self.decisionTreeForReviewInDB(2)
+        self.decisionTreeUpToDB(self.configParameters['reviewValueUp'], 
+                                ['DTReviewDateWW', 'DTReviewDate', 'DTReviewDateWWUp', 'DTReviewDateUp'])
+        
+        self.decisionTreeUpToDB(self.configParameters['reviewValueUp'], 
+                                ['RFReviewDateWW', 'RFReviewDate', 'RFReviewDateWWUp', 'RFReviewDateUp'])
+        
+        self.decisionTreeUpToDB(self.configParameters['reviewValueUp'], 
+                                ['GBReviewDateWW', 'GBReviewDate', 'GBReviewDateWWUp', 'GBReviewDateUp'])
+        
         return
 
     # Последовательный вызов всех необходимых функций

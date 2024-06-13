@@ -48,11 +48,11 @@ class FilmMining(object):
         self.lock = threading.Lock()
         
         logging.basicConfig(
-            filename = '../log/dataMining.log',
+            filename = './log/dataMining.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )       
-        self.logger = logging.getLogger()
+        self.logger  = logging.getLogger()
     
     # Поиск информации по ключу в найденном JSON и возвращение строки
     def checkKeyInDataStr(self, dataJSON: Dict[str, str], dataKey: str) -> str:

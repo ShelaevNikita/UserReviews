@@ -64,9 +64,9 @@ class ReviewMining(object):
         self.lock = threading.Lock()
         
         logging.basicConfig(
-            filename = '../log/dataMining.log',
+            filename = './log/dataMining.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )       
         self.logger = logging.getLogger()
     
@@ -168,7 +168,7 @@ class ReviewMining(object):
                 newReviewForFilm, listPages = self.getCommonReviewInfo(filmID)
                 if len(listPages) == 0:
                     continue
-                
+
             else:
                 flagCreate = False
                 with self.lock:

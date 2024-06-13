@@ -7,6 +7,5 @@
 	dataPathPredict  = predict
 	reviewWindowSize = 5
 	reviewValueUp    = 5
-	reviewDegree     = 7
 	lastDays         = 15
 	timeCache        = 60

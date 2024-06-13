@@ -10,3 +10,4 @@
 	reviewWindowSize = 5
 	reviewValueUp    = 5
 	reviewDegree     = 7
+	countTrees       = 100

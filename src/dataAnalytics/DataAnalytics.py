@@ -26,7 +26,7 @@ class DataAnalytics(object):
 
     # Инициализация класса
     def __init__(self):       
-        self.configFile         = 'dataAnalytics/analyticConfigFile.txt'   
+        self.configFile         = './src/dataAnalytics/analyticConfigFile.txt'   
         self.configParameters   = self.DefaultConfigParameters
         
         self.collectionFilms    = None
@@ -34,11 +34,11 @@ class DataAnalytics(object):
         self.collectionAnalytic = None
 
         logging.basicConfig(
-            filename = '../log/dataAnalytic.log',
+            filename = './log/dataAnalytic.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )
-        self.logger = logging.getLogger()
+        self.logger  = logging.getLogger()
     
     # Получение данных из конфигурационного файла
     def splitConfigFile(self):    
