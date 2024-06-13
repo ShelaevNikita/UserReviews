@@ -269,7 +269,7 @@ class DataPredict(object):
                  
             elif (keyTree == 1):
                 self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
-                                           'RTReviewDateWW', keyTree)
+                                           'RFReviewDateWW', keyTree)
                 
             elif (keyTree == 2):
                 self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
@@ -286,7 +286,7 @@ class DataPredict(object):
                 
             elif (keyTree == 1):
                 self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
-                                           'RTReviewDate', keyTree)
+                                           'RFReviewDate', keyTree)
                 
             elif (keyTree == 2):
                 self.decisionTreeForReview(cursorReviewDateWW['valuesParam'], reviewID,
