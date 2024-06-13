@@ -64,9 +64,9 @@ class ReviewMining(object):
         self.lock = threading.Lock()
         
         logging.basicConfig(
-            filename = '../log/dataMining.log',
+            filename = './log/dataMining.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )       
         self.logger = logging.getLogger()
     
@@ -140,7 +140,7 @@ class ReviewMining(object):
         newReviewForFilm.countNegative =   int(pageKinopoisk.find('li', class_ = 'neut').find('b').text)
         newReviewForFilm.reviewPercent = float(pageKinopoisk.find('li', class_ = 'perc').find('b').text[:-1])
         
-        return [newReviewForFilm, list(range(1, (reviewCountMax + 99) // 100 + 1))]
+        return [newReviewForFilm, list(range(1, (reviewCountMax + 199) // 200 + 1))]
 
     # Добавление новой записи в MongoDB
     def reviewToMongoDB(self, review: ReviewForFilm, flagCreate: bool):
@@ -166,7 +166,9 @@ class ReviewMining(object):
             flagCreate = True
             if len(pages) == 0:
                 newReviewForFilm, listPages = self.getCommonReviewInfo(filmID)
-                
+                if len(listPages) == 0:
+                    continue
+
             else:
                 flagCreate = False
                 with self.lock:

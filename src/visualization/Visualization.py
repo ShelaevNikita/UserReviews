@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from charset_normalizer import from_bytes
 import plotly.graph_objects as go
 import logging
 
@@ -21,7 +20,6 @@ class VisualizationReviews():
         'dataPathPredict'  : 'predict',
         'reviewWindowSize' : 5,
         'reviewValueUp'    : 5,
-        'reviewDegree'     : 7,
         'lastDays'         : 15,
         'timeCache'        : 60
     }
@@ -40,14 +38,17 @@ class VisualizationReviews():
         'Линейная регрессия для распределения отзывов к фильму/сериалу по месяцам',
         'Полиномиальная регрессия для распределения отзывов к фильму/сериалу по месяцам',
         'Дерево решений для распределения отзывов к фильму/сериалу по месяцам',
-        'Распределение отзывов к фильму/сериалу за последние N дней'        
+        'Случайный лес для распределения отзывов к фильму/сериалу по месяцам',
+        'Градиентный бустинг для распределения отзывов к фильму/сериалу по месяцам',
+        'Распределение отзывов к фильму/сериалу за последние N дней (1-3)',
+        'Распределение отзывов к фильму/сериалу за последние N дней (4-5)'
     ]
 
     # Инициализация класса
     def __init__(self):
         self.app = Dash('UserReviews')
         
-        self.configFile         = 'visualization/visualizationConfigFile.txt'   
+        self.configFile         = './src/visualization/visualizationConfigFile.txt'   
         self.configParameters   = self.DefaultConfigParameters
         
         self.collectionAnalytic = None
@@ -57,11 +58,11 @@ class VisualizationReviews():
         #self.memClient = base.Client('localhost:11211')
         
         logging.basicConfig(
-            filename = '../log/visualization.log',
+            filename = './log/visualization.log',
             format   = '%(asctime)s | %(levelname)s: %(message)s',
-            filemode = 'w+'
+            filemode = 'w'
         )
-        self.logger = logging.getLogger()  
+        self.logger  = logging.getLogger()  
     
     # Получение данных из конфигурационного файла
     def splitConfigFile(self):    
@@ -383,11 +384,10 @@ class VisualizationReviews():
 
                 reviewID      = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
                 
-                reviewDegree  = self.configParameters['reviewDegree']
                 reviewValueUp = self.configParameters['reviewValueUp']
 
-                PRpredictDateKey   = f'PRReviewDate/{reviewID}/{reviewDegree}'
-                PRpredictDateKeyUp = f'PRReviewDateUp/{reviewID}/{reviewDegree}/{reviewValueUp}'
+                PRpredictDateKey   = f'PRReviewDate/{reviewID}'
+                PRpredictDateKeyUp = f'PRReviewDateUp/{reviewID}/{reviewValueUp}'
                 
                 reviewDate      = self.getCursorFromCacheDB(f'reviewDate/{reviewID}')
                 PRpredictDate   = self.getCursorFromCacheDB(PRpredictDateKey, False)
@@ -413,9 +413,9 @@ class VisualizationReviews():
                 if reviewCount is None:
                     return no_update
 
-                reviewID = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
+                reviewID      = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
 
-                reviewValueUp      = self.configParameters['reviewValueUp']
+                reviewValueUp = self.configParameters['reviewValueUp']
 
                 DTpredictDateKey     = f'DTReviewDate/{reviewID}'
                 DTpredictDateWWKey   = f'DTReviewDateWW/{reviewID}'
@@ -447,20 +447,99 @@ class VisualizationReviews():
                 ])                
                 title = f'Распределение отзывов к фильму c ID {reviewID} по месяцам'
                 fig.update_layout(title = title, yaxis_title = 'Количество отзывов в месяц')
-
+            
             elif (indicator == self.FilterKeys[12]):
                 reviewCount = self.getCursorFromCacheDB('reviewCount')
                 if reviewCount is None:
                     return no_update
 
                 reviewID = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
-                
+
                 reviewValueUp      = self.configParameters['reviewValueUp']
-                reviewDegree       = self.configParameters['reviewDegree']
+
+                RFpredictDateKey     = f'RFReviewDate/{reviewID}'
+                RFpredictDateWWKey   = f'RFReviewDateWW/{reviewID}'
+                RFpredictDateUpKey   = f'RFReviewDateUp/{reviewID}/{reviewValueUp}'
+                RFpredictDateWWUpKey = f'RFReviewDateWWUp/{reviewID}/{reviewValueUp}'
+                
+                reviewDate        = self.getCursorFromCacheDB(f'reviewDate/{reviewID}')
+                RFpredictDate     = self.getCursorFromCacheDB(RFpredictDateKey, False)
+                RFpredictDateWW   = self.getCursorFromCacheDB(RFpredictDateWWKey, False)
+                RFpredictDateUp   = self.getCursorFromCacheDB(RFpredictDateUpKey, False)
+                RFpredictDateWWUp = self.getCursorFromCacheDB(RFpredictDateWWUpKey, False)
+                
+                if reviewDate is None or RFpredictDate is None or RFpredictDateWW is None or \
+                        RFpredictDateUp is None or RFpredictDateWWUp is None:
+                    return no_update
+
+                initX,   initY   = self.splitArrToXAndY(reviewDate)
+                RFX,     RFY     = self.splitArrToXAndY(RFpredictDate)
+                RFWWX,   RFWWY   = self.splitArrToXAndY(RFpredictDateWW)
+                RFUpX,   RFUpY   = self.splitArrToXAndY(RFpredictDateUp)
+                RFWWUpX, RFWWUpY = self.splitArrToXAndY(RFpredictDateWWUp)
+
+                fig = go.Figure([
+                    go.Scatter(x = initX,   y = initY,   name = 'Исходные данные'),
+                    go.Scatter(x = RFX,     y = RFY,     name = 'Случайный лес на исходных данных'),
+                    go.Scatter(x = RFWWX,   y = RFWWY,   name = 'Случайный лес на медианных данных'),
+                    go.Scatter(x = RFUpX,   y = RFUpY,   name = 'Случайный лес на исходных данных, поднятый на K'),
+                    go.Scatter(x = RFWWUpX, y = RFWWUpY, name = 'Случайный лес на медианных данных, поднятый на K')
+                ])                
+                title = f'Распределение отзывов к фильму c ID {reviewID} по месяцам'
+                fig.update_layout(title = title, yaxis_title = 'Количество отзывов в месяц')
+            
+            elif (indicator == self.FilterKeys[13]):
+                reviewCount = self.getCursorFromCacheDB('reviewCount')
+                if reviewCount is None:
+                    return no_update
+
+                reviewID      = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
+
+                reviewValueUp = self.configParameters['reviewValueUp']
+
+                GBpredictDateKey     = f'GBReviewDate/{reviewID}'
+                GBpredictDateWWKey   = f'GBReviewDateWW/{reviewID}'
+                GBpredictDateUpKey   = f'GBReviewDateUp/{reviewID}/{reviewValueUp}'
+                GBpredictDateWWUpKey = f'GBReviewDateWWUp/{reviewID}/{reviewValueUp}'
+                
+                reviewDate        = self.getCursorFromCacheDB(f'reviewDate/{reviewID}')
+                GBpredictDate     = self.getCursorFromCacheDB(GBpredictDateKey, False)
+                GBpredictDateWW   = self.getCursorFromCacheDB(GBpredictDateWWKey, False)
+                GBpredictDateUp   = self.getCursorFromCacheDB(GBpredictDateUpKey, False)
+                GBpredictDateWWUp = self.getCursorFromCacheDB(GBpredictDateWWUpKey, False)
+                
+                if reviewDate is None or GBpredictDate is None or GBpredictDateWW is None or \
+                        GBpredictDateUp is None or GBpredictDateWWUp is None:
+                    return no_update
+
+                initX,   initY   = self.splitArrToXAndY(reviewDate)
+                GBX,     GBY     = self.splitArrToXAndY(GBpredictDate)
+                GBWWX,   GBWWY   = self.splitArrToXAndY(GBpredictDateWW)
+                GBUpX,   GBUpY   = self.splitArrToXAndY(GBpredictDateUp)
+                GBWWUpX, GBWWUpY = self.splitArrToXAndY(GBpredictDateWWUp)
+
+                fig = go.Figure([
+                    go.Scatter(x = initX,   y = initY,   name = 'Исходные данные'),
+                    go.Scatter(x = GBX,     y = GBY,     name = 'Градиентный бустинг на исходных данных'),
+                    go.Scatter(x = GBWWX,   y = GBWWY,   name = 'Градиентный бустинг на медианных данных'),
+                    go.Scatter(x = GBUpX,   y = GBUpY,   name = 'Градиентный бустинг на исходных данных, поднятый на K'),
+                    go.Scatter(x = GBWWUpX, y = GBWWUpY, name = 'Градиентный бустинг на медианных данных, поднятый на K')
+                ])                
+                title = f'Распределение отзывов к фильму c ID {reviewID} по месяцам'
+                fig.update_layout(title = title, yaxis_title = 'Количество отзывов в месяц')
+
+            elif (indicator == self.FilterKeys[14]):
+                reviewCount = self.getCursorFromCacheDB('reviewCount')
+                if reviewCount is None:
+                    return no_update
+
+                reviewID      = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
+                
+                reviewValueUp = self.configParameters['reviewValueUp']
                 
                 reviewDateWWUpKey    = f'reviewDateWWUp/{reviewID}/{reviewValueUp}'
                 LRpredictDateUpKey   = f'LRReviewDateUp/{reviewID}/{reviewValueUp}'
-                PRpredictDateUpKey   = f'PRReviewDateUp/{reviewID}/{reviewDegree}/{reviewValueUp}'
+                PRpredictDateUpKey   = f'PRReviewDateUp/{reviewID}/{reviewValueUp}'
                 DTpredictDateUpKey   = f'DTReviewDateUp/{reviewID}/{reviewValueUp}'
                 DTpredictDateWWUpKey = f'DTReviewDateWWUp/{reviewID}/{reviewValueUp}'
 
@@ -489,6 +568,50 @@ class VisualizationReviews():
                     go.Scatter(x = initX, y = PRpredY,   name = 'Полиномиальная регрессия с K-уровнем'),
                     go.Scatter(x = initX, y = DTpredY,   name = 'Дерево решений на исходных данных, поднятое на K'),
                     go.Scatter(x = initX, y = DTpredWWY, name = 'Дерево решений на медианных данных, поднятое на K')
+                ])                
+                title = f'Распределение отзывов к фильму c ID {reviewID} за последние N дней'
+                fig.update_layout(title = title, yaxis_title = 'Количество отзывов в день')
+
+            elif (indicator == self.FilterKeys[15]):
+                reviewCount = self.getCursorFromCacheDB('reviewCount')
+                if reviewCount is None:
+                    return no_update
+
+                reviewID      = reviewCount[0][(min(takeElem, len(reviewCount[0])) - 1)][0]
+                
+                reviewValueUp = self.configParameters['reviewValueUp']
+                
+                reviewDateWWUpKey    = f'reviewDateWWUp/{reviewID}/{reviewValueUp}'
+                RFpredictDateUpKey   = f'RFReviewDateUp/{reviewID}/{reviewValueUp}'
+                RFpredictDateWWUpKey = f'RFReviewDateWWUp/{reviewID}/{reviewValueUp}'
+                GBpredictDateUpKey   = f'GBReviewDateUp/{reviewID}/{reviewValueUp}'
+                GBpredictDateWWUpKey = f'GBReviewDateWWUp/{reviewID}/{reviewValueUp}'
+
+                reviewDateDay     = self.getCursorFromCacheDB(f'reviewDateDay/{reviewID}')
+                reviewDateWWUp    = self.getCursorFromCacheDB(reviewDateWWUpKey)
+                RFpredictDateUp   = self.getCursorFromCacheDB(RFpredictDateUpKey, False)
+                RFpredictDateWWUp = self.getCursorFromCacheDB(RFpredictDateWWUpKey, False)
+                GBpredictDateUp   = self.getCursorFromCacheDB(GBpredictDateUpKey, False)
+                GBpredictDateWWUp = self.getCursorFromCacheDB(GBpredictDateWWUpKey, False)
+
+                if reviewDateDay is None or reviewDateWWUp is None or RFpredictDateUp is None or \
+                         RFpredictDateWWUp is None or GBpredictDateUp is None or GBpredictDateWWUp is None:
+                    return no_update
+
+                initX, initY = self.splitArrToXAndY(reviewDateDay[-self.configParameters['lastDays']:])
+                mediY        = [reviewDateWWUp[-1][1]]    * self.configParameters['lastDays']
+                RFpredY      = [RFpredictDateUp[-1][1]]   * self.configParameters['lastDays']
+                RFpredWWY    = [RFpredictDateWWUp[-1][1]] * self.configParameters['lastDays']
+                GBpredY      = [GBpredictDateUp[-1][1]]   * self.configParameters['lastDays']
+                GBpredWWY    = [GBpredictDateWWUp[-1][1]] * self.configParameters['lastDays']
+
+                fig = go.Figure([
+                    go.Scatter(x = initX, y = initY,     name = 'Исходные данные'),
+                    go.Scatter(x = initX, y = mediY,     name = 'Медиана, поднятая на K'),
+                    go.Scatter(x = initX, y = RFpredY,   name = 'Случайный лес на исходный данных, поднятый на K'),
+                    go.Scatter(x = initX, y = RFpredWWY, name = 'Случайный лес на медианных данных, поднятый на K'),
+                    go.Scatter(x = initX, y = GBpredY,   name = 'Градиентный бустинг на исходных данных, поднятый на K'),
+                    go.Scatter(x = initX, y = GBpredWWY, name = 'Градиентный бустинг на медианных данных, поднятый на K')
                 ])                
                 title = f'Распределение отзывов к фильму c ID {reviewID} за последние N дней'
                 fig.update_layout(title = title, yaxis_title = 'Количество отзывов в день')
