@@ -166,6 +166,8 @@ class ReviewMining(object):
             flagCreate = True
             if len(pages) == 0:
                 newReviewForFilm, listPages = self.getCommonReviewInfo(filmID)
+                if len(listPages) == 0:
+                    continue
                 
             else:
                 flagCreate = False
