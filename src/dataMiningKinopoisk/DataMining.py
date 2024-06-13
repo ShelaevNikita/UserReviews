@@ -89,14 +89,13 @@ class ClassDataMining(object):
     # Создание массива пользовательских отзывов, которых ещё нет в MongoDB
     def createReviewIDArray(self) -> Dict[int, List[int]]:
         listFilmIDAndCount = self.getFilmIDFromMongoDB()
-        listReviews        = self.collectionReviews.find()
-        listReviewIDs      = [record['_id'] for record in listReviews]
+        listReviewIDs      = [record['_id'] for record in self.collectionReviews.find()]
         reviewFilmPage     = {}
         for (filmID, reviewCount) in listFilmIDAndCount:
             if filmID not in listReviewIDs and reviewCount > 0:
                 reviewFilmPage[filmID] = []
             
-        for review in listReviews:
+        for review in self.collectionReviews.find():
             if len(review['pages']) < ((review['reviewMax'] + 199) // 200):
                 listPages = list(range(1, (review['reviewMax'] + 199) // 200 + 1))
                 for page in review['pages']:
