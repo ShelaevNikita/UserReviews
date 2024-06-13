@@ -140,7 +140,7 @@ class ReviewMining(object):
         newReviewForFilm.countNegative =   int(pageKinopoisk.find('li', class_ = 'neut').find('b').text)
         newReviewForFilm.reviewPercent = float(pageKinopoisk.find('li', class_ = 'perc').find('b').text[:-1])
         
-        return [newReviewForFilm, list(range(1, (reviewCountMax + 99) // 100 + 1))]
+        return [newReviewForFilm, list(range(1, (reviewCountMax + 199) // 200 + 1))]
 
     # Добавление новой записи в MongoDB
     def reviewToMongoDB(self, review: ReviewForFilm, flagCreate: bool):
