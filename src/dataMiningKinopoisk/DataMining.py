@@ -74,13 +74,13 @@ class ClassDataMining(object):
         return mongoClient
 
     # Получение массива ID фильмов / сериалов, находящихся в MongoDB
-    def getFilmIDInMongoDB(self) -> List[Tuple[int, int]]:
+    def getFilmIDFromMongoDB(self) -> List[Tuple[int, int]]:
         return [(record['_id'], record['ratingCount']) for record in self.collectionFilms.find()]
 
     # Создание массива ID фильмов / сериалов, которых ещё нет в MongoDB
     def createFilmIDArray(self) -> List[int]:
         listAllID = list(range(self.configParameters['maxID'] + 1))      
-        for (filmID, _) in self.getFilmIDInMongoDB():
+        for (filmID, _) in self.getFilmIDFromMongoDB():
             listAllID.remove(filmID)
             
         shuffle(listAllID)
@@ -88,14 +88,15 @@ class ClassDataMining(object):
 
     # Создание массива пользовательских отзывов, которых ещё нет в MongoDB
     def createReviewIDArray(self) -> Dict[int, List[int]]:
-        listFilmIDAndCount = self.getFilmIDInMongoDB()
-        listReviews        = [record['_id'] for record in self.collectionReviews.find()]
+        listFilmIDAndCount = self.getFilmIDFromMongoDB()
+        listReviews        = self.collectionReviews.find()
+        listReviewIDs      = [record['_id'] for record in listReviews]
         reviewFilmPage     = {}
         for (filmID, reviewCount) in listFilmIDAndCount:
-            if filmID not in listReviews and reviewCount > 0:
+            if filmID not in listReviewIDs and reviewCount > 0:
                 reviewFilmPage[filmID] = []
             
-        for review in self.collectionReviews.find():
+        for review in listReviews:
             if len(review['pages']) < ((review['reviewMax'] + 199) // 200):
                 listPages = list(range(1, (review['reviewMax'] + 199) // 200 + 1))
                 for page in review['pages']:
@@ -117,8 +118,8 @@ class ClassDataMining(object):
         self.collectionFilms   = connectionDB[self.configParameters['dataPathFilms']]
         self.collectionReviews = connectionDB[self.configParameters['dataPathReviews']]
 
-        filmID         = self.createFilmIDArray()
-        FilmMining.FilmMining(self.configParameters, mongoClient, filmID).main()
+        filmIDs        = self.createFilmIDArray()
+        FilmMining.FilmMining(self.configParameters, mongoClient, filmIDs).main()
         
         reviewFilmPage = self.createReviewIDArray()
         ReviewMining.ReviewMining(self.configParameters, mongoClient, reviewFilmPage).main()
