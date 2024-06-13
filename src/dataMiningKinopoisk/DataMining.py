@@ -15,9 +15,9 @@ class ClassDataMining(object):
     
     # Значения конфигурационного файла по умолчанию
     DefaultConfigParameters = {
-        'pathMongoDB'     : 'mongodb://localhost:27017/',
-        'databaseName'    : 'userReviews',
-        'dataPathFilms'   : 'films',
+      'pathMongoDB'     : 'mongodb://localhost:27017/',
+      'databaseName'    : 'userReviews',
+      'dataPathFilms'   : 'films',
 	    'dataPathReviews' : 'reviews',    
 	    'threads'         : 4,
 	    'maxID'           : 5000000,
@@ -118,7 +118,7 @@ class ClassDataMining(object):
         self.collectionReviews = connectionDB[self.configParameters['dataPathReviews']]
 
         filmIDs        = self.createFilmIDArray()
-        #FilmMining.FilmMining(self.configParameters, mongoClient, filmIDs).main()
+        FilmMining.FilmMining(self.configParameters, mongoClient, filmIDs).main()
         
         reviewFilmPage = self.createReviewIDArray()
         ReviewMining.ReviewMining(self.configParameters, mongoClient, reviewFilmPage).main()
