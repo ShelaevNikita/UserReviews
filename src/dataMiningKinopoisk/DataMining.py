@@ -96,8 +96,8 @@ class ClassDataMining(object):
                 reviewFilmPage[filmID] = []
             
         for review in self.collectionReviews.find():
-            if len(review['pages']) < ((review['reviewMax'] + 99) // 100):
-                listPages = list(range(1, (review['reviewMax'] + 99) // 100 + 1))
+            if len(review['pages']) < ((review['reviewMax'] + 199) // 200):
+                listPages = list(range(1, (review['reviewMax'] + 199) // 200 + 1))
                 for page in review['pages']:
                     listPages.remove(page)
                     
