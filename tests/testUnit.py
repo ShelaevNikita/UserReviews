@@ -1,12 +1,12 @@
 
 import pytest
 
-import src.dataMiningKinopoisk.DataMining as DM
-import src.dataAnalytics.DataAnalytics    as DA
-import src.dataPredict.DataPredict        as DP
-import src.visualization.Visualization    as VS
-import src.dataClass.FilmDataClass        as FC
-import src.dataClass.ReviewDataClass      as RC
+import dataMiningKinopoisk.DataMining as DM
+import dataAnalytics.DataAnalytics    as DA
+import dataPredict.DataPredict        as DP
+import visualization.Visualization    as VS
+import dataClass.FilmDataClass        as FC
+import dataClass.ReviewDataClass      as RC
 
 class TestUnit(object):
     
